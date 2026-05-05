@@ -9,14 +9,21 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser()
-  const parsed = schema.safeParse(await request.json())
+  let json: unknown
+  try {
+    json = await request.json()
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const parsed = schema.safeParse(json)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const encrypted = encrypt(parsed.data.refreshToken)
+  const encrypted = encrypt(parsed.data.refreshToken.trim())
 
   const { error } = await supabase.from('gmail_connections').upsert({
     user_id: user.id,
-    email_address: parsed.data.emailAddress,
+    email_address: parsed.data.emailAddress.trim().toLowerCase(),
     refresh_token_enc: encrypted,
   })
 

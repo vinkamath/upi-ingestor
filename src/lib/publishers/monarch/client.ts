@@ -41,33 +41,41 @@ export async function createMonarchTransaction(userId: string, payload: {
     throw new Error('MONARCH_GRAPHQL_URL not set')
   }
 
-  // Minimal GraphQL call surface; compatible with community API approach.
-  const response = await fetch(process.env.MONARCH_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${auth.secret}`,
-    },
-    body: JSON.stringify({
-      query: `mutation CreateTransaction($input: CreateTransactionInput!) {\n  createTransaction(input: $input) { id }\n}`,
-      variables: {
-        input: {
-          accountId: auth.defaultAccountId,
-          amount: payload.amount,
-          merchantName: payload.merchantName,
-          categoryName: payload.category,
-          date: payload.date,
-          notes: payload.notes,
-        },
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10000)
+
+  try {
+    // Minimal GraphQL call surface; compatible with community API approach.
+    const response = await fetch(process.env.MONARCH_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.secret}`,
       },
-    }),
-  })
+      body: JSON.stringify({
+        query: `mutation CreateTransaction($input: CreateTransactionInput!) {\n  createTransaction(input: $input) { id }\n}`,
+        variables: {
+          input: {
+            accountId: auth.defaultAccountId,
+            amount: payload.amount,
+            merchantName: payload.merchantName,
+            categoryName: payload.category,
+            date: payload.date,
+            notes: payload.notes,
+          },
+        },
+      }),
+      signal: controller.signal,
+    })
 
-  const json = await response.json()
-  const id = json?.data?.createTransaction?.id as string | undefined
-  if (!response.ok || !id) {
-    throw new Error(`Monarch publish failed: ${JSON.stringify(json)}`)
+    const json = await response.json()
+    const id = json?.data?.createTransaction?.id as string | undefined
+    if (!response.ok || !id) {
+      throw new Error(`Monarch publish failed: ${JSON.stringify(json)}`)
+    }
+
+    return id
+  } finally {
+    clearTimeout(timeout)
   }
-
-  return id
 }

@@ -10,16 +10,23 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   const { supabase, user } = await getUser()
-  const parsed = schema.safeParse(await request.json())
+  let json: unknown
+  try {
+    json = await request.json()
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const parsed = schema.safeParse(json)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const encrypted = encrypt(parsed.data.credential)
+  const encrypted = encrypt(parsed.data.credential.trim())
 
   const { error } = await supabase.from('monarch_connections').upsert({
     user_id: user.id,
-    email: parsed.data.email,
+    email: parsed.data.email.trim().toLowerCase(),
     credential_enc: encrypted,
-    default_account_id: parsed.data.defaultAccountId ?? null,
+    default_account_id: parsed.data.defaultAccountId?.trim() || null,
   })
 
   if (error) return Response.json({ error: error.message }, { status: 400 })
