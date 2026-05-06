@@ -17,6 +17,8 @@ type Tx = {
 
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
+  const [usdPerInr, setUsdPerInr] = useState<number | null>(null)
+  const [rateDate, setRateDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [republishingId, setRepublishingId] = useState<string | null>(null)
@@ -27,6 +29,9 @@ export default function TransactionsPage() {
     const res = await fetch('/api/transactions')
     const json = await res.json()
     const rows = json.data ?? []
+    const fxRate = typeof json?.fx?.usdPerInr === 'number' ? json.fx.usdPerInr : null
+    setUsdPerInr(fxRate)
+    setRateDate(typeof json?.fx?.rateDate === 'string' ? json.fx.rateDate : null)
     setTxs(rows)
     setIsLoading(false)
     return rows.length as number
@@ -93,6 +98,8 @@ export default function TransactionsPage() {
     return () => window.clearTimeout(id)
   }, [])
 
+  const usdToInr = usdPerInr && usdPerInr > 0 ? 1 / usdPerInr : null
+
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -105,6 +112,11 @@ export default function TransactionsPage() {
           {isLoading ? 'Loading...' : 'Fetch Gmail now'}
         </button>
       </div>
+      <p className="text-sm text-gray-600">
+        {usdToInr
+          ? `FX rate: 1 USD = ${usdToInr.toFixed(2)} INR${rateDate ? ` (as of ${rateDate})` : ''}`
+          : 'FX rate: unavailable'}
+      </p>
       {fetchMessage ? <p className="text-sm text-gray-600">{fetchMessage}</p> : null}
 
       <div className="rounded-lg border bg-white overflow-x-auto">
@@ -125,7 +137,12 @@ export default function TransactionsPage() {
               <tr key={tx.id} className="border-t">
                 <td className="p-2">{new Date(tx.occurred_at).toLocaleString()}</td>
                 <td className="p-2">{tx.merchant_raw}</td>
-                <td className="p-2">{tx.amount}</td>
+                <td className="p-2">
+                  <div>INR {tx.amount.toFixed(2)}</div>
+                  <div className="text-gray-500">
+                    USD {usdPerInr ? Math.abs(tx.amount * usdPerInr).toFixed(2) : '-'}
+                  </div>
+                </td>
                 <td className="p-2">{tx.category ?? '-'}</td>
                 <td className="p-2">
                   {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
