@@ -1,18 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function SettingsPage() {
-  const [gmail, setGmail] = useState({ emailAddress: '', refreshToken: '' })
+  const [gmailStatus, setGmailStatus] = useState<{
+    connected: boolean
+    emailAddress: string | null
+    lastUpdatedAt: string | null
+  } | null>(null)
   const [monarch, setMonarch] = useState({ email: '', credential: '', defaultAccountId: '' })
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
 
-  async function saveGmail() {
-    await fetch('/api/connect/gmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gmail),
-    })
+  async function loadGmailStatus() {
+    const res = await fetch('/api/connect/gmail/status')
+    const json = await res.json()
+    setGmailStatus(json)
   }
 
   async function saveMonarch() {
@@ -29,15 +31,32 @@ export default function SettingsPage() {
     setTelegramCode(json.linkCode)
   }
 
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void loadGmailStatus()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [])
+
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-8">
       <h1 className="text-2xl font-semibold">Connections</h1>
 
       <section className="rounded-lg border bg-white p-4 space-y-3">
         <h2 className="font-medium">Gmail</h2>
-        <input className="w-full border rounded p-2" placeholder="Gmail address" value={gmail.emailAddress} onChange={(e) => setGmail((s) => ({ ...s, emailAddress: e.target.value }))} />
-        <input className="w-full border rounded p-2" placeholder="Google refresh token" value={gmail.refreshToken} onChange={(e) => setGmail((s) => ({ ...s, refreshToken: e.target.value }))} />
-        <button className="rounded bg-black text-white px-3 py-2" onClick={saveGmail}>Save Gmail connection</button>
+        {gmailStatus?.connected ? (
+          <p className="text-sm text-gray-700">
+            Connected as <strong>{gmailStatus.emailAddress}</strong>
+          </p>
+        ) : (
+          <p className="text-sm text-gray-700">Not connected yet.</p>
+        )}
+        <a
+          className="inline-block rounded bg-black text-white px-3 py-2"
+          href="/api/auth/google?next=/settings"
+        >
+          {gmailStatus?.connected ? 'Reconnect Gmail' : 'Connect Gmail with Google'}
+        </a>
       </section>
 
       <section className="rounded-lg border bg-white p-4 space-y-3">

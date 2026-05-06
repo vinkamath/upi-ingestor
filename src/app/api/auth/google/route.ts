@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const redirectTo = `${url.origin}/auth/callback`
+  const next = url.searchParams.get('next') ?? '/'
+  const safeNext = next.startsWith('/') ? next : '/'
+  const redirectTo = `${url.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`
   const supabase = await createClient()
 
   const { data, error } = await supabase.auth.signInWithOAuth({
