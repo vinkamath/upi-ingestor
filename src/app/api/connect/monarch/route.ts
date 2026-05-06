@@ -46,7 +46,12 @@ async function validateMonarchCredential(credential: string, defaultAccountId?: 
     }
   }
 
-  return { ok: true as const, accountCount: accounts.length }
+  const accountOptions = accounts.map((account) => ({
+    id: account.id,
+    name: account.displayName || account.name || account.id,
+  }))
+
+  return { ok: true as const, accountCount: accounts.length, accounts: accountOptions }
 }
 
 export async function POST(request: Request) {
@@ -78,5 +83,10 @@ export async function POST(request: Request) {
   })
 
   if (error) return Response.json({ error: error.message }, { status: 400 })
-  return Response.json({ ok: true, accountCount: validation.accountCount })
+  return Response.json({
+    ok: true,
+    accountCount: validation.accountCount,
+    accounts: validation.accounts,
+    selectedDefaultAccountId: defaultAccountId ?? null,
+  })
 }

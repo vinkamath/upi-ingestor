@@ -9,6 +9,7 @@ export default function SettingsPage() {
     lastUpdatedAt: string | null
   } | null>(null)
   const [monarch, setMonarch] = useState({ email: '', credential: '', defaultAccountId: '' })
+  const [monarchAccounts, setMonarchAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [isSavingMonarch, setIsSavingMonarch] = useState(false)
   const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
@@ -35,8 +36,16 @@ export default function SettingsPage() {
       return
     }
 
+    const accounts = (json?.accounts ?? []) as Array<{ id: string; name: string }>
+    setMonarchAccounts(accounts)
+    if (accounts.length > 0) {
+      const selected =
+        (json?.selectedDefaultAccountId as string | null) ?? (monarch.defaultAccountId || accounts[0].id)
+      setMonarch((s) => ({ ...s, defaultAccountId: selected }))
+    }
+
     setMonarchMessage(
-      `Monarch connection saved and verified${json?.accountCount ? ` (${json.accountCount} account(s) found)` : ''}.`
+      `Monarch connection saved and verified${json?.accountCount ? ` (${json.accountCount} account(s) found)` : ''}. Select a default account and save again if needed.`
     )
   }
 
@@ -78,7 +87,21 @@ export default function SettingsPage() {
         <h2 className="font-medium">Monarch</h2>
         <input className="w-full border rounded p-2" placeholder="Monarch email" value={monarch.email} onChange={(e) => setMonarch((s) => ({ ...s, email: e.target.value }))} />
         <input className="w-full border rounded p-2" placeholder="Monarch token or credential" value={monarch.credential} onChange={(e) => setMonarch((s) => ({ ...s, credential: e.target.value }))} />
-        <input className="w-full border rounded p-2" placeholder="Default account id" value={monarch.defaultAccountId} onChange={(e) => setMonarch((s) => ({ ...s, defaultAccountId: e.target.value }))} />
+        {monarchAccounts.length > 0 ? (
+          <select
+            className="w-full border rounded p-2"
+            value={monarch.defaultAccountId}
+            onChange={(e) => setMonarch((s) => ({ ...s, defaultAccountId: e.target.value }))}
+          >
+            {monarchAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input className="w-full border rounded p-2" placeholder="Default account id" value={monarch.defaultAccountId} onChange={(e) => setMonarch((s) => ({ ...s, defaultAccountId: e.target.value }))} />
+        )}
         <button className="rounded bg-black text-white px-3 py-2 disabled:opacity-50" onClick={saveMonarch} disabled={isSavingMonarch}>
           {isSavingMonarch ? 'Saving...' : 'Save Monarch connection'}
         </button>
