@@ -19,6 +19,7 @@ export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [republishingId, setRepublishingId] = useState<string | null>(null)
   const [fetchMessage, setFetchMessage] = useState<string | null>(null)
 
   async function load() {
@@ -68,6 +69,21 @@ export default function TransactionsPage() {
     await load()
     setDeletingId(null)
     setFetchMessage('Transaction deleted. You can refetch now to apply new rules.')
+  }
+
+  async function republishTransaction(id: string) {
+    setRepublishingId(id)
+    const res = await fetch(`/api/transactions/${id}/republish`, { method: 'POST' })
+    const json = await res.json()
+    if (!res.ok) {
+      setFetchMessage(json?.error ?? 'Failed to republish transaction. Please try again.')
+      setRepublishingId(null)
+      return
+    }
+
+    await load()
+    setRepublishingId(null)
+    setFetchMessage(json?.message ?? 'Transaction republished successfully.')
   }
 
   useEffect(() => {
@@ -122,13 +138,24 @@ export default function TransactionsPage() {
                 </td>
                 <td className="p-2">{tx.bank_ref_id}</td>
                 <td className="p-2">
-                  <button
-                    className="text-sm text-red-600 disabled:opacity-50"
-                    onClick={() => deleteTransaction(tx.id)}
-                    disabled={deletingId === tx.id}
-                  >
-                    {deletingId === tx.id ? 'Deleting...' : 'Delete'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {tx.status === 'failed' ? (
+                      <button
+                        className="text-sm text-blue-700 disabled:opacity-50"
+                        onClick={() => republishTransaction(tx.id)}
+                        disabled={republishingId === tx.id}
+                      >
+                        {republishingId === tx.id ? 'Republishing...' : 'Republish'}
+                      </button>
+                    ) : null}
+                    <button
+                      className="text-sm text-red-600 disabled:opacity-50"
+                      onClick={() => deleteTransaction(tx.id)}
+                      disabled={deletingId === tx.id || republishingId === tx.id}
+                    >
+                      {deletingId === tx.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
