@@ -9,6 +9,13 @@ type MonarchAuth = {
   content: string
 }
 
+function buildTokenHeader(secret: string) {
+  const trimmed = secret.trim()
+  if (trimmed.toLowerCase().startsWith('token ')) return trimmed
+  if (trimmed.toLowerCase().startsWith('bearer ')) return `Token ${trimmed.slice(7).trim()}`
+  return `Token ${trimmed}`
+}
+
 export async function getMonarchAuth(userId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -50,7 +57,7 @@ export async function createMonarchTransaction(userId: string, payload: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${auth.secret}`,
+        Authorization: buildTokenHeader(auth.secret),
       },
       body: JSON.stringify({
         query: `mutation CreateTransaction($input: CreateTransactionInput!) {\n  createTransaction(input: $input) { id }\n}`,

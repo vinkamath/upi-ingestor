@@ -15,6 +15,7 @@ type Tx = {
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [fetchMessage, setFetchMessage] = useState<string | null>(null)
 
   async function load() {
@@ -45,6 +46,25 @@ export default function TransactionsPage() {
       return
     }
     setFetchMessage(`Fetch complete. Loaded ${count} transaction(s).`)
+  }
+
+  async function deleteTransaction(id: string) {
+    const shouldDelete = window.confirm(
+      'Delete this transaction? You can refetch it from Gmail and apply updated rules.'
+    )
+    if (!shouldDelete) return
+
+    setDeletingId(id)
+    const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      setFetchMessage('Failed to delete transaction. Please try again.')
+      setDeletingId(null)
+      return
+    }
+
+    await load()
+    setDeletingId(null)
+    setFetchMessage('Transaction deleted. You can refetch now to apply new rules.')
   }
 
   useEffect(() => {
@@ -78,6 +98,7 @@ export default function TransactionsPage() {
               <th className="text-left p-2">Category</th>
               <th className="text-left p-2">Status</th>
               <th className="text-left p-2">Ref</th>
+              <th className="text-left p-2">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -89,11 +110,20 @@ export default function TransactionsPage() {
                 <td className="p-2">{tx.category ?? '-'}</td>
                 <td className="p-2">{tx.status}</td>
                 <td className="p-2">{tx.bank_ref_id}</td>
+                <td className="p-2">
+                  <button
+                    className="text-sm text-red-600 disabled:opacity-50"
+                    onClick={() => deleteTransaction(tx.id)}
+                    disabled={deletingId === tx.id}
+                  >
+                    {deletingId === tx.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </td>
               </tr>
             ))}
             {txs.length === 0 ? (
               <tr>
-                <td className="p-4 text-sm text-gray-500" colSpan={6}>
+                <td className="p-4 text-sm text-gray-500" colSpan={7}>
                   No transactions yet. Click Fetch Gmail now to test ingestion.
                 </td>
               </tr>

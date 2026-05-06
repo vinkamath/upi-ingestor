@@ -9,6 +9,8 @@ export default function SettingsPage() {
     lastUpdatedAt: string | null
   } | null>(null)
   const [monarch, setMonarch] = useState({ email: '', credential: '', defaultAccountId: '' })
+  const [isSavingMonarch, setIsSavingMonarch] = useState(false)
+  const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
 
   async function loadGmailStatus() {
@@ -18,11 +20,24 @@ export default function SettingsPage() {
   }
 
   async function saveMonarch() {
-    await fetch('/api/connect/monarch', {
+    setMonarchMessage(null)
+    setIsSavingMonarch(true)
+    const res = await fetch('/api/connect/monarch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(monarch),
     })
+    const json = await res.json()
+    setIsSavingMonarch(false)
+
+    if (!res.ok) {
+      setMonarchMessage(`Failed to save Monarch connection: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+
+    setMonarchMessage(
+      `Monarch connection saved and verified${json?.accountCount ? ` (${json.accountCount} account(s) found)` : ''}.`
+    )
   }
 
   async function createTelegramLink() {
@@ -64,7 +79,10 @@ export default function SettingsPage() {
         <input className="w-full border rounded p-2" placeholder="Monarch email" value={monarch.email} onChange={(e) => setMonarch((s) => ({ ...s, email: e.target.value }))} />
         <input className="w-full border rounded p-2" placeholder="Monarch token or credential" value={monarch.credential} onChange={(e) => setMonarch((s) => ({ ...s, credential: e.target.value }))} />
         <input className="w-full border rounded p-2" placeholder="Default account id" value={monarch.defaultAccountId} onChange={(e) => setMonarch((s) => ({ ...s, defaultAccountId: e.target.value }))} />
-        <button className="rounded bg-black text-white px-3 py-2" onClick={saveMonarch}>Save Monarch connection</button>
+        <button className="rounded bg-black text-white px-3 py-2 disabled:opacity-50" onClick={saveMonarch} disabled={isSavingMonarch}>
+          {isSavingMonarch ? 'Saving...' : 'Save Monarch connection'}
+        </button>
+        {monarchMessage ? <p className="text-sm text-gray-700">{monarchMessage}</p> : null}
       </section>
 
       <section className="rounded-lg border bg-white p-4 space-y-3">
