@@ -27,8 +27,11 @@ const empty = {
 export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([])
   const [draft, setDraft] = useState(empty)
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<Omit<Rule, 'id'> | null>(null)
   const [categories, setCategories] = useState<MonarchCategoryOption[]>([])
   const [useCustomCategory, setUseCustomCategory] = useState(false)
+  const [useCustomEditCategory, setUseCustomEditCategory] = useState(false)
   const [categoryStatus, setCategoryStatus] = useState<string | null>(null)
 
   async function loadRules() {
@@ -77,7 +80,39 @@ export default function RulesPage() {
   }
 
   async function removeRule(id: string) {
+    const shouldDelete = window.confirm('Delete this rule? This cannot be undone.')
+    if (!shouldDelete) return
+
     await fetch(`/api/rules/${id}`, { method: 'DELETE' })
+    await loadRules()
+  }
+
+  function startEdit(rule: Rule) {
+    setEditingRuleId(rule.id)
+    setEditDraft({
+      match_type: rule.match_type,
+      field: rule.field,
+      pattern: rule.pattern,
+      category: rule.category,
+      priority: rule.priority,
+    })
+    setUseCustomEditCategory(categories.length === 0)
+  }
+
+  function cancelEdit() {
+    setEditingRuleId(null)
+    setEditDraft(null)
+    setUseCustomEditCategory(false)
+  }
+
+  async function saveEdit(ruleId: string) {
+    if (!editDraft || !editDraft.category.trim()) return
+    await fetch(`/api/rules/${ruleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...editDraft, category: editDraft.category.trim() }),
+    })
+    cancelEdit()
     await loadRules()
   }
 
@@ -128,10 +163,51 @@ export default function RulesPage() {
       <div className="rounded-lg border bg-white p-4 space-y-3">
         {rules.map((rule) => (
           <div key={rule.id} className="flex items-center justify-between border rounded p-3">
-            <p className="text-sm">
-              <strong>{rule.category}</strong> when {rule.field} {rule.match_type} <code>{rule.pattern}</code>
-            </p>
-            <button className="text-sm text-red-600" onClick={() => removeRule(rule.id)}>Delete</button>
+            {editingRuleId === rule.id && editDraft ? (
+              <div className="w-full grid gap-2 sm:grid-cols-2">
+                <select className="border rounded p-2" value={editDraft.match_type} onChange={(e) => setEditDraft((s) => (s ? { ...s, match_type: e.target.value as Rule['match_type'] } : s))}>
+                  <option value="contains">contains</option>
+                  <option value="equals">equals</option>
+                  <option value="regex">regex</option>
+                </select>
+                <select className="border rounded p-2" value={editDraft.field} onChange={(e) => setEditDraft((s) => (s ? { ...s, field: e.target.value as Rule['field'] } : s))}>
+                  <option value="merchant">merchant</option>
+                  <option value="sender">sender</option>
+                  <option value="body">body</option>
+                </select>
+                <input className="border rounded p-2" value={editDraft.pattern} onChange={(e) => setEditDraft((s) => (s ? { ...s, pattern: e.target.value } : s))} />
+                {useCustomEditCategory || categories.length === 0 ? (
+                  <input className="border rounded p-2" value={editDraft.category} onChange={(e) => setEditDraft((s) => (s ? { ...s, category: e.target.value } : s))} />
+                ) : (
+                  <select className="border rounded p-2" value={editDraft.category} onChange={(e) => setEditDraft((s) => (s ? { ...s, category: e.target.value } : s))}>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.name}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input className="border rounded p-2" type="number" value={editDraft.priority} onChange={(e) => setEditDraft((s) => (s ? { ...s, priority: Number(e.target.value) } : s))} />
+                <label className="text-sm text-gray-600 flex items-center gap-2">
+                  <input type="checkbox" checked={useCustomEditCategory} onChange={(e) => setUseCustomEditCategory(e.target.checked)} />
+                  Use custom category text
+                </label>
+                <div className="flex items-center gap-3">
+                  <button className="text-sm text-blue-700" onClick={() => saveEdit(rule.id)}>Save</button>
+                  <button className="text-sm text-gray-600" onClick={cancelEdit}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm">
+                  <strong>{rule.category}</strong> when {rule.field} {rule.match_type} <code>{rule.pattern}</code>
+                </p>
+                <div className="flex items-center gap-3">
+                  <button className="text-sm text-blue-700" onClick={() => startEdit(rule)}>Edit</button>
+                  <button className="text-sm text-red-600" onClick={() => removeRule(rule.id)}>Delete</button>
+                </div>
+              </>
+            )}
           </div>
         ))}
         {rules.length === 0 ? <p className="text-sm text-gray-500">No rules yet.</p> : null}
