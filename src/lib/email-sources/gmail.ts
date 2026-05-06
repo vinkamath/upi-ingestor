@@ -140,7 +140,14 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
       }
       const tx = parseUpiEmail(message.id, from, body)
       if (tx) {
-        parsed.push(tx)
+        const internalDateMs = Number(full.data.internalDate)
+        const emailReceivedAt = Number.isFinite(internalDateMs) && internalDateMs > 0
+          ? new Date(internalDateMs).toISOString()
+          : new Date().toISOString()
+        parsed.push({
+          ...tx,
+          emailReceivedAt,
+        })
       } else {
         skippedParseFailure += 1
       }

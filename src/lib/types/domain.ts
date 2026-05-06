@@ -5,6 +5,7 @@ export type ParsedTransaction = {
   merchantRaw: string
   merchantNormalized: string
   occurredAt: string
+  emailReceivedAt: string
   bankRefId: string
   account?: string
   currency: 'INR'

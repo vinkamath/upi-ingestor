@@ -46,6 +46,7 @@ export async function processUserTransactions(userId: string) {
           merchant_raw: tx.merchantRaw,
           merchant_normalized: tx.merchantNormalized,
           occurred_at: tx.occurredAt,
+          email_received_at: tx.emailReceivedAt,
           raw_payload: tx.rawPayload,
           status: 'pending',
         })

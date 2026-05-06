@@ -35,6 +35,7 @@ export function parseHdfcUpiEmail(messageId: string, body: string): ParsedTransa
     merchantRaw,
     merchantNormalized: normalizeMerchant(merchantRaw),
     occurredAt,
+    emailReceivedAt: new Date().toISOString(),
     bankRefId,
     currency: 'INR',
     sourceMessageId: messageId,

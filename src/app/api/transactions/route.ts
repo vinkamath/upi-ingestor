@@ -58,6 +58,7 @@ export async function GET() {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
+    .order('email_received_at', { ascending: false })
     .order('occurred_at', { ascending: false })
     .limit(100)
 

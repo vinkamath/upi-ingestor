@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 type Tx = {
   id: string
   occurred_at: string
+  email_received_at?: string | null
   amount: number
   merchant_raw: string
   category: string | null
@@ -135,7 +136,7 @@ export default function TransactionsPage() {
           <tbody>
             {txs.map((tx) => (
               <tr key={tx.id} className="border-t">
-                <td className="p-2">{new Date(tx.occurred_at).toLocaleString()}</td>
+                <td className="p-2">{new Date(tx.email_received_at ?? tx.occurred_at).toLocaleString()}</td>
                 <td className="p-2">{tx.merchant_raw}</td>
                 <td className="p-2">
                   <div>INR {tx.amount.toFixed(2)}</div>
