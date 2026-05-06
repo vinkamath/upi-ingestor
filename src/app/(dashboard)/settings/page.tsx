@@ -147,11 +147,6 @@ export default function SettingsPage() {
         {telegramCode ? <p className="text-sm text-gray-700">Run <code>/start {telegramCode}</code> in your bot chat.</p> : null}
       </section>
 
-      <section className="rounded-lg border bg-white p-4">
-        <button className="rounded border px-3 py-2" onClick={() => fetch('/api/gmail/fetch-now', { method: 'POST' })}>
-          Fetch Gmail transactions now
-        </button>
-      </section>
     </main>
   )
 }
