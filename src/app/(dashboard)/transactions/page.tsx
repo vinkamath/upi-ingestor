@@ -136,7 +136,7 @@ export default function TransactionsPage() {
                     tx.status
                   )}
                 </td>
-                <td className="p-2">{tx.bank_ref_id}</td>
+                <td className="p-2">{tx.bank_ref_id.slice(0, 12)}</td>
                 <td className="p-2">
                   <div className="flex items-center gap-3">
                     {tx.status === 'failed' ? (
