@@ -1,5 +1,5 @@
 import { getUser } from '@/lib/db/server'
-import { encrypt } from '@/lib/crypto/encryption'
+import { decrypt, encrypt } from '@/lib/crypto/encryption'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -15,11 +15,9 @@ function normalizeCredential(input: string) {
   return value
 }
 
-async function validateMonarchCredential(credential: string, defaultAccountId?: string) {
+async function fetchMonarchAccounts(credential: string) {
   const graphqlUrl = process.env.MONARCH_GRAPHQL_URL
-  if (!graphqlUrl) {
-    return { ok: false as const, error: 'MONARCH_GRAPHQL_URL not set' }
-  }
+  if (!graphqlUrl) return null
 
   const response = await fetch(graphqlUrl, {
     method: 'POST',
@@ -35,23 +33,63 @@ async function validateMonarchCredential(credential: string, defaultAccountId?: 
 
   const json = await response.json()
   const accounts = (json?.data?.accounts ?? []) as Array<{ id: string; displayName?: string; name?: string }>
-  if (!response.ok || !Array.isArray(accounts)) {
+  if (!response.ok || !Array.isArray(accounts)) return null
+
+  return accounts.map((account) => ({
+    id: account.id,
+    name: account.displayName || account.name || account.id,
+  }))
+}
+
+async function validateMonarchCredential(credential: string, defaultAccountId?: string) {
+  if (!process.env.MONARCH_GRAPHQL_URL) {
+    return { ok: false as const, error: 'MONARCH_GRAPHQL_URL not set' }
+  }
+
+  const accountOptions = await fetchMonarchAccounts(credential)
+  if (!accountOptions) {
     return { ok: false as const, error: 'Monarch credential check failed' }
   }
 
-  if (defaultAccountId && !accounts.some((account) => account.id === defaultAccountId)) {
+  if (defaultAccountId && !accountOptions.some((account) => account.id === defaultAccountId)) {
     return {
       ok: false as const,
       error: 'Default account id was not found in your Monarch accounts',
     }
   }
 
-  const accountOptions = accounts.map((account) => ({
-    id: account.id,
-    name: account.displayName || account.name || account.id,
-  }))
+  return { ok: true as const, accountCount: accountOptions.length, accounts: accountOptions }
+}
 
-  return { ok: true as const, accountCount: accounts.length, accounts: accountOptions }
+export async function GET() {
+  const { supabase, user } = await getUser()
+  const { data, error } = await supabase
+    .from('monarch_connections')
+    .select('email, default_account_id, credential_enc, updated_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) return Response.json({ error: error.message }, { status: 400 })
+  if (!data) {
+    return Response.json({
+      connected: false,
+      email: null,
+      defaultAccountId: null,
+      accounts: [],
+      lastUpdatedAt: null,
+    })
+  }
+
+  const decrypted = decrypt(data.credential_enc as { iv: string; content: string; authTag: string })
+  const accounts = (await fetchMonarchAccounts(decrypted)) ?? []
+
+  return Response.json({
+    connected: true,
+    email: data.email,
+    defaultAccountId: data.default_account_id,
+    accounts,
+    lastUpdatedAt: data.updated_at,
+  })
 }
 
 export async function POST(request: Request) {

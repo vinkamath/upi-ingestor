@@ -9,6 +9,12 @@ export default function SettingsPage() {
     lastUpdatedAt: string | null
   } | null>(null)
   const [monarch, setMonarch] = useState({ email: '', credential: '', defaultAccountId: '' })
+  const [monarchStatus, setMonarchStatus] = useState<{
+    connected: boolean
+    email: string | null
+    defaultAccountId: string | null
+    lastUpdatedAt: string | null
+  } | null>(null)
   const [monarchAccounts, setMonarchAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [isSavingMonarch, setIsSavingMonarch] = useState(false)
   const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
@@ -47,6 +53,25 @@ export default function SettingsPage() {
     setMonarchMessage(
       `Monarch connection saved and verified${json?.accountCount ? ` (${json.accountCount} account(s) found)` : ''}. Select a default account and save again if needed.`
     )
+    await loadMonarchStatus()
+  }
+
+  async function loadMonarchStatus() {
+    const res = await fetch('/api/connect/monarch')
+    const json = await res.json()
+    if (!res.ok) {
+      setMonarchMessage(`Failed to load Monarch status: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+
+    setMonarchStatus(json)
+    const accounts = (json?.accounts ?? []) as Array<{ id: string; name: string }>
+    setMonarchAccounts(accounts)
+    setMonarch((s) => ({
+      ...s,
+      email: json?.email ?? '',
+      defaultAccountId: (json?.defaultAccountId as string | null) ?? '',
+    }))
   }
 
   async function createTelegramLink() {
@@ -58,6 +83,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const id = window.setTimeout(() => {
       void loadGmailStatus()
+      void loadMonarchStatus()
     }, 0)
     return () => window.clearTimeout(id)
   }, [])
@@ -85,6 +111,13 @@ export default function SettingsPage() {
 
       <section className="rounded-lg border bg-white p-4 space-y-3">
         <h2 className="font-medium">Monarch</h2>
+        {monarchStatus?.connected ? (
+          <p className="text-sm text-gray-700">
+            Connected as <strong>{monarchStatus.email}</strong>
+          </p>
+        ) : (
+          <p className="text-sm text-gray-700">Not connected yet.</p>
+        )}
         <input className="w-full border rounded p-2" placeholder="Monarch email" value={monarch.email} onChange={(e) => setMonarch((s) => ({ ...s, email: e.target.value }))} />
         <input className="w-full border rounded p-2" placeholder="Monarch token or credential" value={monarch.credential} onChange={(e) => setMonarch((s) => ({ ...s, credential: e.target.value }))} />
         {monarchAccounts.length > 0 ? (
