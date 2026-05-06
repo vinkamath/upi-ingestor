@@ -14,11 +14,37 @@ type Tx = {
 
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [fetchMessage, setFetchMessage] = useState<string | null>(null)
 
   async function load() {
+    setIsLoading(true)
     const res = await fetch('/api/transactions')
     const json = await res.json()
-    setTxs(json.data ?? [])
+    const rows = json.data ?? []
+    setTxs(rows)
+    setIsLoading(false)
+    return rows.length as number
+  }
+
+  async function fetchNow() {
+    setFetchMessage('Fetching latest Gmail transactions...')
+    const res = await fetch('/api/gmail/fetch-now', { method: 'POST' })
+    if (!res.ok) {
+      setFetchMessage('Fetch failed. Check server logs and try again.')
+      return
+    }
+
+    const json = await res.json()
+    const summary = json?.summary
+    const count = await load()
+    if (summary) {
+      setFetchMessage(
+        `Fetch complete. matched=${summary.fetched}, parsed=${summary.parsed}, inserted=${summary.inserted}, duplicates=${summary.duplicates}, noBody=${summary.skippedNoBody}, parseFail=${summary.skippedParseFailure}, tableRows=${count}`
+      )
+      return
+    }
+    setFetchMessage(`Fetch complete. Loaded ${count} transaction(s).`)
   }
 
   useEffect(() => {
@@ -30,7 +56,17 @@ export default function TransactionsPage() {
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Transactions</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Transactions</h1>
+        <button
+          className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
+          onClick={fetchNow}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Loading...' : 'Fetch Gmail now'}
+        </button>
+      </div>
+      {fetchMessage ? <p className="text-sm text-gray-600">{fetchMessage}</p> : null}
 
       <div className="rounded-lg border bg-white overflow-x-auto">
         <table className="w-full text-sm">
@@ -55,6 +91,13 @@ export default function TransactionsPage() {
                 <td className="p-2">{tx.bank_ref_id}</td>
               </tr>
             ))}
+            {txs.length === 0 ? (
+              <tr>
+                <td className="p-4 text-sm text-gray-500" colSpan={6}>
+                  No transactions yet. Click Fetch Gmail now to test ingestion.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

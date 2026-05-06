@@ -1,4 +1,4 @@
-import { google } from 'googleapis'
+import { google, gmail_v1 } from 'googleapis'
 import type { ParsedTransaction } from '@/lib/types/domain'
 import { parseUpiEmail } from '@/lib/parsers'
 import { createClient } from '@/lib/supabase/server'
@@ -47,7 +47,41 @@ function getPositiveIntEnv(name: string, fallback: number) {
   return parsed
 }
 
-export async function fetchGmailTransactions(userId: string): Promise<ParsedTransaction[]> {
+function decodeGmailBase64(input: string) {
+  return Buffer.from(input.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+}
+
+function extractTextPlainBody(part?: gmail_v1.Schema$MessagePart): string | null {
+  if (!part) return null
+  if (part.mimeType === 'text/plain' && part.body?.data) {
+    return decodeGmailBase64(part.body.data)
+  }
+
+  for (const child of part.parts ?? []) {
+    const nested = extractTextPlainBody(child)
+    if (nested) return nested
+  }
+
+  if (part.body?.data) {
+    return decodeGmailBase64(part.body.data)
+  }
+
+  return null
+}
+
+export type GmailFetchResult = {
+  transactions: ParsedTransaction[]
+  debug: {
+    query: string
+    matchedMessages: number
+    parsedTransactions: number
+    skippedNoBody: number
+    skippedParseFailure: number
+    sampleSubjects: string[]
+  }
+}
+
+export async function fetchGmailTransactions(userId: string): Promise<GmailFetchResult> {
   const supabase = await createClient()
   const { data: connection, error } = await supabase
     .from('gmail_connections')
@@ -55,7 +89,19 @@ export async function fetchGmailTransactions(userId: string): Promise<ParsedTran
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (error || !connection) return []
+  if (error || !connection) {
+    return {
+      transactions: [],
+      debug: {
+        query: '',
+        matchedMessages: 0,
+        parsedTransactions: 0,
+        skippedNoBody: 0,
+        skippedParseFailure: 0,
+        sampleSubjects: [],
+      },
+    }
+  }
 
   try {
     const refreshToken = decrypt(connection.refresh_token_enc as { iv: string; content: string; authTag: string })
@@ -63,15 +109,20 @@ export async function fetchGmailTransactions(userId: string): Promise<ParsedTran
     const gmail = google.gmail({ version: 'v1', auth })
     const daysBack = getPositiveIntEnv('GMAIL_FETCH_DAYS_BACK', 3)
     const maxResults = getPositiveIntEnv('GMAIL_FETCH_MAX_RESULTS', 25)
+    const labelName = process.env.GMAIL_FETCH_LABEL?.trim() || 'UPI'
+    const query = `label:${labelName} after:${getIstMidnightCutoffEpochSeconds(daysBack)}`
 
     const list = await gmail.users.messages.list({
       userId: 'me',
       maxResults,
-      q: `label:upi after:${getIstMidnightCutoffEpochSeconds(daysBack)}`,
+      q: query,
     })
 
     const messages = list.data.messages ?? []
     const parsed: ParsedTransaction[] = []
+    const sampleSubjects: string[] = []
+    let skippedNoBody = 0
+    let skippedParseFailure = 0
 
     for (const message of messages) {
       if (!message.id) continue
@@ -79,20 +130,45 @@ export async function fetchGmailTransactions(userId: string): Promise<ParsedTran
       const payload = full.data.payload
       const headers = payload?.headers ?? []
       const from = headers.find((h) => h.name?.toLowerCase() === 'from')?.value ?? ''
-      const plainPart = payload?.parts?.find((p) => p.mimeType === 'text/plain')?.body?.data
-      const topBody = payload?.body?.data
-      const bodyData = plainPart ?? topBody
-      if (!bodyData) continue
+      const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? '(no-subject)'
+      if (sampleSubjects.length < 5) sampleSubjects.push(subject)
 
-      // Gmail may return base64url content in body.data.
-      const body = Buffer.from(bodyData.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+      const body = extractTextPlainBody(payload ?? undefined)
+      if (!body) {
+        skippedNoBody += 1
+        continue
+      }
       const tx = parseUpiEmail(message.id, from, body)
-      if (tx) parsed.push(tx)
+      if (tx) {
+        parsed.push(tx)
+      } else {
+        skippedParseFailure += 1
+      }
     }
 
-    return parsed
+    return {
+      transactions: parsed,
+      debug: {
+        query,
+        matchedMessages: messages.length,
+        parsedTransactions: parsed.length,
+        skippedNoBody,
+        skippedParseFailure,
+        sampleSubjects,
+      },
+    }
   } catch (error) {
     console.error('gmail.fetch_failed', { userId, error })
-    return []
+    return {
+      transactions: [],
+      debug: {
+        query: 'error',
+        matchedMessages: 0,
+        parsedTransactions: 0,
+        skippedNoBody: 0,
+        skippedParseFailure: 0,
+        sampleSubjects: [],
+      },
+    }
   }
 }

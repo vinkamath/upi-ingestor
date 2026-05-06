@@ -6,7 +6,21 @@ import { publishers } from '@/lib/publishers'
 
 export async function processUserTransactions(userId: string) {
   const supabase = await createClient()
-  const txs = await fetchGmailTransactions(userId)
+  const fetched = await fetchGmailTransactions(userId)
+  const txs = fetched.transactions
+  const summary = {
+    fetched: fetched.debug.matchedMessages,
+    parsed: fetched.debug.parsedTransactions,
+    inserted: 0,
+    duplicates: 0,
+    needsReview: 0,
+    published: 0,
+    failed: 0,
+    skippedNoBody: fetched.debug.skippedNoBody,
+    skippedParseFailure: fetched.debug.skippedParseFailure,
+    query: fetched.debug.query,
+    sampleSubjects: fetched.debug.sampleSubjects,
+  }
 
   for (const tx of txs) {
     try {
@@ -17,7 +31,10 @@ export async function processUserTransactions(userId: string) {
         .eq('bank_ref_id', tx.bankRefId)
         .maybeSingle()
 
-      if (existing) continue
+      if (existing) {
+        summary.duplicates += 1
+        continue
+      }
 
       const { data: inserted, error: insertError } = await supabase
         .from('transactions')
@@ -35,7 +52,11 @@ export async function processUserTransactions(userId: string) {
         .select('id')
         .single()
 
-      if (insertError || !inserted) continue
+      if (insertError || !inserted) {
+        summary.failed += 1
+        continue
+      }
+      summary.inserted += 1
 
       const categorization = await categorizeTransaction(supabase, userId, tx)
 
@@ -47,6 +68,7 @@ export async function processUserTransactions(userId: string) {
           .maybeSingle()
 
         await supabase.from('transactions').update({ status: 'needs_review' }).eq('id', inserted.id)
+        summary.needsReview += 1
 
         if (tgLink?.chat_id) {
           const { data: categories } = await supabase
@@ -94,8 +116,13 @@ export async function processUserTransactions(userId: string) {
           published_id: publish.externalId ?? null,
         })
         .eq('id', inserted.id)
+      if (publish.success) summary.published += 1
+      else summary.failed += 1
     } catch (error) {
+      summary.failed += 1
       console.error('pipeline.transaction_failed', { userId, bankRefId: tx.bankRefId, error })
     }
   }
+
+  return summary
 }
