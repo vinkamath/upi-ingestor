@@ -10,6 +10,9 @@ type Tx = {
   category: string | null
   status: 'pending' | 'needs_review' | 'published' | 'failed'
   bank_ref_id: string
+  raw_payload?: {
+    publish_error?: string
+  }
 }
 
 export default function TransactionsPage() {
@@ -108,7 +111,15 @@ export default function TransactionsPage() {
                 <td className="p-2">{tx.merchant_raw}</td>
                 <td className="p-2">{tx.amount}</td>
                 <td className="p-2">{tx.category ?? '-'}</td>
-                <td className="p-2">{tx.status}</td>
+                <td className="p-2">
+                  {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
+                    <span title={tx.raw_payload.publish_error} className="cursor-help underline decoration-dotted">
+                      failed
+                    </span>
+                  ) : (
+                    tx.status
+                  )}
+                </td>
                 <td className="p-2">{tx.bank_ref_id}</td>
                 <td className="p-2">
                   <button

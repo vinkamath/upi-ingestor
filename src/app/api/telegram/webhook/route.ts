@@ -89,6 +89,12 @@ export async function POST(request: Request) {
     rawPayload: tx.raw_payload,
     category,
   })
+  const rawPayloadForUpdate = publish.success
+    ? tx.raw_payload
+    : {
+        ...(tx.raw_payload ?? {}),
+        publish_error: publish.error ?? 'Unknown publish error',
+      }
 
   await supabase
     .from('transactions')
@@ -96,6 +102,7 @@ export async function POST(request: Request) {
       category,
       status: publish.success ? 'published' : 'failed',
       published_id: publish.externalId ?? null,
+      raw_payload: rawPayloadForUpdate,
     })
     .eq('id', txId)
 

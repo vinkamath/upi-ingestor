@@ -107,6 +107,12 @@ export async function processUserTransactions(userId: string) {
 
       const publisher = publishers.monarch
       const publish = await publisher.publish(userId, { ...tx, category: categorization.category })
+      const rawPayloadForUpdate = publish.success
+        ? tx.rawPayload
+        : {
+            ...tx.rawPayload,
+            publish_error: publish.error ?? 'Unknown publish error',
+          }
 
       await supabase
         .from('transactions')
@@ -114,6 +120,7 @@ export async function processUserTransactions(userId: string) {
           category: categorization.category,
           status: publish.success ? 'published' : 'failed',
           published_id: publish.externalId ?? null,
+          raw_payload: rawPayloadForUpdate,
         })
         .eq('id', inserted.id)
       if (publish.success) summary.published += 1
