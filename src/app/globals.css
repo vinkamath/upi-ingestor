@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ─── Monarch Design System → shadcn/ui CSS Variable Bridge ─── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Monarch semantic data colors */
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-link: var(--link);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  /* Monarch full color palette */
+  --color-gray-1: #fbfaf8;
+  --color-gray-2: #f6f5f3;
+  --color-gray-3: #efecea;
+  --color-gray-4: #ebe8e5;
+  --color-gray-5: #e4e1de;
+  --color-gray-6: #dcd9d6;
+  --color-gray-7: #d1cecb;
+  --color-gray-8: #bebbb8;
+  --color-gray-9: #8f8c8a;
+  --color-gray-10: #84827f;
+  --color-gray-11: #777573;
+  --color-gray-12: #22201d;
+  --color-orange-9: #ff692d;
+  --color-orange-10: #f35b16;
+  --color-orange-11: #d64700;
+  --color-green-9: #30a46c;
+  --color-red-9: #e5484d;
+  --color-blue-9: #00a2c7;
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Typography */
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
+/* ─── Monarch Theme Tokens ─── */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Core semantic colors */
+    --background: oklch(0.97 0.005 75);       /* #f6f5f3 — warm off-white */
+    --foreground: oklch(0.165 0.009 48);       /* #22201d — dark warm brown */
+
+    --card: oklch(1 0 0);                      /* #ffffff */
+    --card-foreground: oklch(0.165 0.009 48);
+
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.165 0.009 48);
+
+    --primary: oklch(0.658 0.213 32);          /* #ff692d — Monarch orange */
+    --primary-foreground: oklch(1 0 0);
+
+    --secondary: oklch(0.942 0.007 70);        /* #efecea — warm light gray */
+    --secondary-foreground: oklch(0.165 0.009 48);
+
+    --muted: oklch(0.942 0.007 70);            /* #efecea */
+    --muted-foreground: oklch(0.522 0.006 63); /* #777573 */
+
+    --accent: oklch(0.975 0.012 40);           /* #fff5f0 — lightest orange tint */
+    --accent-foreground: oklch(0.55 0.18 35);  /* #d64700 */
+
+    --destructive: oklch(0.611 0.137 17);      /* #e66774 — Monarch negative */
+    --destructive-foreground: oklch(1 0 0);
+
+    --border: oklch(0.888 0 0);                /* #e0e0e0 */
+    --input: oklch(0.888 0 0);
+    --ring: oklch(0.658 0.213 32);             /* #ff692d */
+
+    --radius: 0.75rem;                          /* 12px — Monarch radius-lg */
+
+    /* Semantic data colors */
+    --positive: oklch(0.636 0.139 155);        /* #2daf6f */
+    --positive-foreground: oklch(1 0 0);
+    --negative: oklch(0.611 0.137 17);         /* #e66774 */
+    --warning: oklch(0.838 0.145 84);          /* #f2c94c */
+    --warning-foreground: oklch(0.165 0.009 48);
+    --link: oklch(0.617 0.09 205);             /* #24a6bf */
+
+    /* Sidebar */
+    --sidebar: oklch(0.972 0 0);               /* #f8f8f8 */
+    --sidebar-foreground: oklch(0.165 0.009 48);
+    --sidebar-primary: oklch(0.658 0.213 32);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.942 0.007 70);
+    --sidebar-accent-foreground: oklch(0.165 0.009 48);
+    --sidebar-border: oklch(0.91 0.004 70);    /* #e8e6e3 — warm gray */
+    --sidebar-ring: oklch(0.658 0.213 32);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ─── Base Styles ─── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body, 'DM Sans', ui-sans-serif, system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display, 'Lora', ui-serif, Georgia, serif);
+  }
 }
