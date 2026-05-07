@@ -9,6 +9,6 @@ export interface ButtonProps {
   children?: React.ReactNode;
 }
 
-export function Button({ variant = 'outline', size = 'md', ...rest }: ButtonProps) {
+export function Button({ variant = 'outline', size = 'medium', ...rest }: ButtonProps) {
   return React.createElement('button', { 'data-variant': variant, 'data-size': size, ...rest });
 }
