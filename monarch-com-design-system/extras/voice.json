@@ -1,0 +1,86 @@
+{
+  "tone": "friendly",
+  "pronoun": "we→you",
+  "headingStyle": "Sentence case",
+  "headingLengthClass": "verbose",
+  "ctaVerbs": [
+    {
+      "value": "accept",
+      "count": 2
+    },
+    {
+      "value": "deny",
+      "count": 1
+    },
+    {
+      "value": "close",
+      "count": 1
+    },
+    {
+      "value": "features",
+      "count": 1
+    },
+    {
+      "value": "how",
+      "count": 1
+    },
+    {
+      "value": "see",
+      "count": 1
+    },
+    {
+      "value": "can",
+      "count": 1
+    }
+  ],
+  "buttonPatterns": [
+    {
+      "value": "accept\ndeny non-essential",
+      "count": 1
+    },
+    {
+      "value": "accept",
+      "count": 1
+    },
+    {
+      "value": "deny non-essential",
+      "count": 1
+    },
+    {
+      "value": "close cookie preferences",
+      "count": 1
+    },
+    {
+      "value": "features",
+      "count": 1
+    },
+    {
+      "value": "how does monarch work for couples? does it cost extra to add additional household members?",
+      "count": 1
+    },
+    {
+      "value": "what can my partner see in my shared account?",
+      "count": 1
+    },
+    {
+      "value": "can we set up joint budgets and goals?",
+      "count": 1
+    }
+  ],
+  "sampleHeadings": [
+    "Stay on the same page about money",
+    "Your entire household in a single dashboard",
+    "Collaboration made easy",
+    "Go further, together",
+    "More ways to collaborate with Monarch",
+    "Stay on the same page about money",
+    "Your entire household in a single dashboard",
+    "Collaboration made easy",
+    "Go further, together",
+    "More ways to collaborate with Monarch"
+  ],
+  "stats": {
+    "buttons": 8,
+    "headings": 19
+  }
+}

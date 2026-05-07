@@ -1,0 +1,11 @@
+:root {
+  --color-primary: #ff692d;
+  --color-secondary: #f6f5f3;
+  --color-accent: #f35b16;
+  --color-background: #f6f5f3;
+  --color-foreground: #000000;
+  --radius: 8px;
+  --shadow: 0 4px 6px rgba(0,0,0,0.1);
+  --font-sans: 'ABC Oracle', system-ui, sans-serif;
+}
+body { background: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); }

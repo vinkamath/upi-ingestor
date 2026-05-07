@@ -1,0 +1,25 @@
+# Design brief
+Page type: **legal**.
+Material language: **flat**.
+Voice: Tone: friendly · Headings: Sentence case · CTA verbs: [object Object], [object Object], [object Object], [object Object], [object Object], [object Object].
+## Tokens
+```ts
+export const tokens = {
+  colors: ['#dcd9d6', '#22201d', '#000000', '#ffffff', '#f6f5f3', '#ff692d', '#777573', '#363431', '#f35b16'],
+  fonts: ['[object Object]', '[object Object]', '[object Object]', '[object Object]'],
+  radii: ['12', '50', '1000', '9999'],
+  shadows: ['rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(34, 32, 29, 0.1) 0px 10px 15px -3px, rgba(34, 32, 29, 0.1) 0px 4px 6px -4px', 'rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(34, 32, 29, 0.05) 0px 1px 2px 0px', 'rgb(204, 204, 204) 0px 0px 2px 2px'],
+};
+```
+## Sections
+- feature-grid
+- testimonial — heading: "Stay on the same page about money"
+- feature-grid — heading: "Your entire household in a single dashboard"
+- cta — heading: "More ways to collaborate with Monarch"
+- testimonial — heading: ""We like Monarch because you can customize your dashboard, choosing what you wan"
+- faq — heading: "FAQ"
+- cta — heading: "Track, budget, and feel good about your money with Monarch in your corner."
+- footer
+## Library
+
+Use plain Tailwind CSS without a component library.

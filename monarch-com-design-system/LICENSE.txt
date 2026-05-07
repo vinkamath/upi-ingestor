@@ -1,0 +1,20 @@
+Design System Pack — Provenance
+================================
+
+Source: https://www.monarch.com/for-couples
+Captured: 2026-05-07
+Tool: designlang (https://designlang.app, MIT)
+
+The token values, type scale, spacing system, and component anatomy in
+this pack were inferred from the publicly-accessible computed styles of
+the source URL via a headless browser. No source files, proprietary
+assets, or copyrighted media were accessed or included.
+
+You are free to use these values as a starting point, reference, or
+inspiration. The packaging itself (this README, the bundle layout, the
+emitter output formats) is released under MIT by the designlang project.
+
+Trademarks, logos, brand names, and other identifiable assets of the
+source remain the property of their respective owners and are not
+licensed by this pack. Do not pass off this pack as the original site's
+official design system without permission.

@@ -1,0 +1,263 @@
+:root {
+  /* Colors — Primary */
+  --color-primary: #ff692d;
+  --color-secondary: #f6f5f3;
+  --color-accent: #f35b16;
+
+  /* Colors — Neutrals */
+  --color-neutral-50: #dcd9d6;
+  --color-neutral-100: #22201d;
+  --color-neutral-200: #000000;
+  --color-neutral-300: #ffffff;
+  --color-neutral-400: #777573;
+  --color-neutral-500: #363431;
+
+  /* Colors — Backgrounds */
+  --color-bg: #f6f5f3;
+  --color-bg-1: #ffffff;
+  --color-bg-2: #22201d;
+  --color-bg-3: #efecea;
+  --color-bg-4: #ff692d;
+
+  /* Colors — Text */
+  --color-text: #000000;
+  --color-text-1: #22201d;
+  --color-text-2: #363431;
+  --color-text-3: #ffffff;
+  --color-text-4: #fefcfb;
+
+  /* Typography — Families */
+  --font-body: 'ABC Oracle', sans-serif;
+  --font-body: 'ui-sans-serif', sans-serif;
+  --font-body: 'Helvetica', sans-serif;
+  --font-heading: 'Copernicus', sans-serif;
+
+  /* Typography — Scale */
+  --font-size-40: 40px;
+  --font-size-32: 32px;
+  --font-size-20: 20px;
+  --font-size-18: 18px;
+  --font-size-16: 16px;
+  --font-size-15: 15px;
+  --font-size-14: 14px;
+  --font-size-12: 12px;
+
+  /* Spacing */
+  --spacing-3: 3px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-64: 64px;
+  --spacing-72: 72px;
+  --spacing-80: 80px;
+  --spacing-128: 128px;
+  --spacing-190: 190px;
+
+  /* Border Radius */
+  --radius-lg: 12px;
+  --radius-full: 50px;
+  --radius-full: 1000px;
+  --radius-full: 9999px;
+
+  /* Box Shadows */
+  --shadow-sm: rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(34, 32, 29, 0.1) 0px 10px 15px -3px, rgba(34, 32, 29, 0.1) 0px 4px 6px -4px;
+  --shadow-sm: rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(34, 32, 29, 0.05) 0px 1px 2px 0px;
+  --shadow-xs: rgb(204, 204, 204) 0px 0px 2px 2px;
+
+  /* Original Site Variables */
+  /* — colors — */
+  --theme-orange-foreground: #fff;
+  --theme-blue-foreground: #fff;
+  --theme-green-foreground: #fff;
+  --theme-purple-foreground: #fff;
+  --theme-yellow-foreground: var(--gray-12);
+  --theme-gray-foreground: var(--gray-12);
+  --theme-none-foreground: var(--gray-12);
+  --font-primary: "ABC Oracle",sans-serif;
+  --font-secondary: "Copernicus",sans-serif;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-border-spacing-x: 0;
+  --tw-ring-color: #556bfc80;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-offset-width: 0px;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-inset: ;
+  --tw-border-spacing-y: 0;
+  /* — spacing — */
+  --tw-numeric-spacing: ;
+  --tw-contain-size: ;
+  /* — shadows — */
+  --tw-drop-shadow: ;
+  --tw-shadow: 0 0 #0000;
+  /* — other — */
+  --gray-1: #fbfaf8;
+  --gray-2: #f6f5f3;
+  --gray-3: #efecea;
+  --gray-4: #ebe8e5;
+  --gray-5: #e4e1de;
+  --gray-6: #dcd9d6;
+  --gray-7: #d1cecb;
+  --gray-8: #bebbb8;
+  --gray-9: #8f8c8a;
+  --gray-10: #84827f;
+  --gray-11: #777573;
+  --gray-12: #22201d;
+  --orange-1: #fefcfb;
+  --orange-2: #fff5f0;
+  --orange-3: #ffe9de;
+  --orange-4: #ffd7c4;
+  --orange-5: #ffc9b1;
+  --orange-6: #ffb99c;
+  --orange-7: #ffa586;
+  --orange-8: #f48d68;
+  --orange-9: #ff692d;
+  --orange-10: #f35b16;
+  --orange-11: #d64700;
+  --orange-12: #592c1d;
+  --yellow-1: #fefdfb;
+  --yellow-2: #fefbe9;
+  --yellow-3: #fff7c2;
+  --yellow-4: #ffee9c;
+  --yellow-5: #fbe577;
+  --yellow-6: #f3d673;
+  --yellow-7: #e9c162;
+  --yellow-8: #e2a336;
+  --yellow-9: #ffc53d;
+  --yellow-10: #ffba18;
+  --yellow-11: #ab6400;
+  --yellow-12: #4f3422;
+  --blue-1: #fafdfe;
+  --blue-2: #f2fafb;
+  --blue-3: #def7f9;
+  --blue-4: #caf1f6;
+  --blue-5: #b5e9f0;
+  --blue-6: #9ddde7;
+  --blue-7: #7dcedc;
+  --blue-8: #3db9cf;
+  --blue-9: #00a2c7;
+  --blue-10: #0797b9;
+  --blue-11: #107d98;
+  --blue-12: #0d3c48;
+  --green-1: #fbfefc;
+  --green-2: #f4fbf6;
+  --green-3: #e6f6eb;
+  --green-4: #d6f1df;
+  --green-5: #c4e8d1;
+  --green-6: #adddc0;
+  --green-7: #8eceaa;
+  --green-8: #5bb98b;
+  --green-9: #30a46c;
+  --green-10: #2b9a66;
+  --green-11: #218358;
+  --green-12: #193b2d;
+  --purple-1: #fefcfe;
+  --purple-2: #fbf7fe;
+  --purple-3: #f7edfe;
+  --purple-4: #f2e2fc;
+  --purple-5: #ead5f9;
+  --purple-6: #e0c4f4;
+  --purple-7: #d1afec;
+  --purple-8: #be93e4;
+  --purple-9: #8e4ec6;
+  --purple-10: #8347b9;
+  --purple-11: #8145b5;
+  --purple-12: #402060;
+  --red-1: #fffcfc;
+  --red-2: #fff7f7;
+  --red-3: #feebec;
+  --red-4: #ffdbdc;
+  --red-5: #ffcdce;
+  --red-6: #fdbdbe;
+  --red-7: #f4a9aa;
+  --red-8: #eb8e90;
+  --red-9: #e5484d;
+  --red-10: #dc3e42;
+  --red-11: #ce2c31;
+  --red-12: #641723;
+  --pink-1: #fffcfe;
+  --pink-2: #fef7fb;
+  --pink-3: #fee9f5;
+  --pink-4: #fbdcef;
+  --pink-5: #f6cee7;
+  --pink-6: #efbfdd;
+  --pink-7: #e7acd0;
+  --pink-8: #dd93c2;
+  --pink-9: #d6409f;
+  --pink-10: #cf3897;
+  --pink-11: #c2298a;
+  --pink-12: #651249;
+  --indigo-1: #fdfdfe;
+  --indigo-2: #f7f9ff;
+  --indigo-3: #edf2fe;
+  --indigo-4: #e1e9ff;
+  --indigo-5: #d2deff;
+  --indigo-6: #c1d0ff;
+  --indigo-7: #abbdf9;
+  --indigo-8: #8da4ef;
+  --indigo-9: #3e63dd;
+  --indigo-10: #3358d4;
+  --indigo-11: #3a5bc7;
+  --indigo-12: #1f2d5c;
+  --theme-orange-background: var(--orange-9);
+  --theme-blue-background: var(--blue-9);
+  --theme-green-background: var(--green-9);
+  --theme-purple-background: var(--pink-9);
+  --theme-yellow-background: var(--yellow-9);
+  --theme-gray-background: var(--gray-4);
+  --theme-none-background: transparent;
+  --tw-backdrop-sepia: ;
+  --tw-sepia: ;
+  --tw-ordinal: ;
+  --tw-contain-style: ;
+  --tw-backdrop-invert: ;
+  --tw-backdrop-grayscale: ;
+  --tw-hue-rotate: ;
+  --tw-pan-y: ;
+  --tw-rotate: 0;
+  --tw-gradient-via-position: ;
+  --tw-saturate: ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-grayscale: ;
+  --tw-backdrop-hue-rotate: ;
+  --tw-gradient-to-position: ;
+  --tw-numeric-fraction: ;
+  --tw-skew-y: 0;
+  --tw-slashed-zero: ;
+  --tw-backdrop-opacity: ;
+  --tw-gradient-from-position: ;
+  --tw-pinch-zoom: ;
+  --tw-contain-paint: ;
+  --tw-backdrop-saturate: ;
+  --tw-brightness: ;
+  --tw-scale-y: 1;
+  --tw-backdrop-contrast: ;
+  --tw-backdrop-brightness: ;
+  --tw-pan-x: ;
+  --tw-translate-y: 0;
+  --tw-contrast: ;
+  --tw-skew-x: 0;
+  --tw-backdrop-blur: ;
+  --tw-translate-x: 0;
+  --tw-scale-x: 1;
+  --tw-blur: ;
+  --tw-invert: ;
+  --tw-numeric-figure: ;
+  --tw-contain-layout: ;
+  /* — dependencies — */
+  --theme-orange-background: --orange-9;
+  --theme-blue-background: --blue-9;
+  --theme-green-background: --green-9;
+  --theme-purple-background: --pink-9;
+  --theme-yellow-background: --yellow-9;
+  --theme-yellow-foreground: --gray-12;
+  --theme-gray-background: --gray-4;
+  --theme-gray-foreground: --gray-12;
+  --theme-none-foreground: --gray-12;
+  /* — semantic — */
+  success: [object Object];
+  warning: [object Object];
+  error: [object Object];
+  info: [object Object];
+
+}
