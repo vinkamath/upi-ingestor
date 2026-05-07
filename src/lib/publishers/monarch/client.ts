@@ -180,6 +180,24 @@ export async function createMonarchTransaction(userId: string, payload: {
       throw new Error(`Monarch category not found for "${payload.category}"`)
     }
 
+    const { response: tagsResponse, json: tagsJson } = await executeGraphql(
+      `query RuleTags($search: String, $limit: Int) {
+        householdTransactionTags(search: $search, limit: $limit) {
+          id
+          name
+        }
+      }`,
+      { search: 'UPI', limit: 50 }
+    )
+    const tags = (tagsJson?.data?.householdTransactionTags ?? []) as Array<{ id?: string; name?: string }>
+    if (!tagsResponse.ok || !Array.isArray(tags)) {
+      throw new Error(`Monarch tag lookup failed: ${JSON.stringify(tagsJson)}`)
+    }
+    const upiTag = tags.find((tag) => tag.name?.trim().toLowerCase() === 'upi')
+    if (!upiTag?.id) {
+      throw new Error('Monarch tag "UPI" was not found')
+    }
+
     const normalizedDate = toMonarchDate(payload.date)
     const today = ymdUtc(new Date())
     let usdPerInrRate: number | null = null
@@ -237,7 +255,35 @@ export async function createMonarchTransaction(userId: string, payload: {
     const createErrors = (json?.data?.createTransaction?.errors ?? []) as Array<{ message?: string }>
     const id = json?.data?.createTransaction?.transaction?.id as string | undefined
     if (response.ok && topLevelErrors.length === 0 && createErrors.length === 0 && id) {
-      return id
+      const { response: setTagsResponse, json: setTagsJson } = await executeGraphql(
+        `mutation Web_SetTransactionTags($input: SetTransactionTagsInput!) {
+          setTransactionTags(input: $input) {
+            errors { message code }
+            transaction { id tags { id name } }
+          }
+        }`,
+        {
+          input: {
+            transactionId: id,
+            tagIds: [upiTag.id],
+          },
+        }
+      )
+      const setTagsTopLevelErrors = (setTagsJson?.errors ?? []) as Array<{ message?: string }>
+      const setTagsErrors = (setTagsJson?.data?.setTransactionTags?.errors ?? []) as Array<{ message?: string }>
+      if (setTagsResponse.ok && setTagsTopLevelErrors.length === 0 && setTagsErrors.length === 0) {
+        return id
+      }
+
+      const setTagsTopLevelMessage = setTagsTopLevelErrors
+        .map((error) => error.message?.trim() || 'Unknown error')
+        .join('; ')
+      const setTagsMessage = setTagsErrors.map((error) => error.message?.trim() || 'Unknown error').join('; ')
+      throw new Error(
+        setTagsTopLevelMessage ||
+          setTagsMessage ||
+          `Monarch tag assignment failed: ${JSON.stringify(setTagsJson)}`
+      )
     }
 
     const topLevelMessage = topLevelErrors.map((error) => error.message?.trim() || 'Unknown error').join('; ')

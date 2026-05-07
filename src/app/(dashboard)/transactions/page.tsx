@@ -245,6 +245,44 @@ export default function TransactionsPage() {
   const selectedCount = filteredTxs.reduce((count, tx) => count + (selectedIds[tx.id] ? 1 : 0), 0)
   const allSelected = filteredTxs.length > 0 && selectedCount === filteredTxs.length
 
+  async function publishSelectedTransactions() {
+    const eligible = filteredTxs
+      .filter((tx) => selectedIds[tx.id])
+      .map((tx) => ({ id: tx.id, category: categoryDrafts[tx.id]?.trim() }))
+      .filter((row): row is { id: string; category: string } => Boolean(row.category))
+
+    if (eligible.length === 0) {
+      setFetchMessage('Select at least one transaction with an assigned category.')
+      return
+    }
+
+    setPublishingAll(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const row of eligible) {
+      try {
+        const res = await fetch(`/api/transactions/${row.id}/republish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: row.category }),
+        })
+        if (res.ok) successCount += 1
+        else failCount += 1
+      } catch {
+        failCount += 1
+      }
+    }
+
+    await load()
+    setPublishingAll(false)
+    setFetchMessage(
+      failCount === 0
+        ? `Published ${successCount} transaction(s).`
+        : `Published ${successCount} transaction(s). ${failCount} failed.`
+    )
+  }
+
   async function publishAllVisible() {
     const eligible = filteredTxs
       .filter((tx) => tx.status !== 'published')
@@ -347,11 +385,24 @@ export default function TransactionsPage() {
           </button>
         <button
           className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
-          onClick={publishAllVisible}
-          disabled={publishingAll || Boolean(publishingId) || Boolean(deletingId) || Boolean(savingCategoryId)}
+            onClick={publishSelectedTransactions}
+            disabled={
+              publishingAll ||
+              Boolean(publishingId) ||
+              Boolean(deletingId) ||
+              Boolean(savingCategoryId) ||
+              selectedCount === 0
+            }
         >
-          {publishingAll ? 'Publishing all...' : 'Publish all'}
+            {publishingAll ? 'Publishing...' : `Publish (${selectedCount})`}
         </button>
+          <button
+            className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
+            onClick={publishAllVisible}
+            disabled={publishingAll || Boolean(publishingId) || Boolean(deletingId) || Boolean(savingCategoryId)}
+          >
+            {publishingAll ? 'Publishing all...' : 'Publish all visible'}
+          </button>
         </div>
       </div>
       {fetchMessage ? <p className="text-sm text-gray-600">{fetchMessage}</p> : null}
@@ -455,15 +506,17 @@ export default function TransactionsPage() {
                 <td className="p-2">{tx.bank_ref_id.slice(0, 12)}</td>
                 <td className="p-2">
                   <div className="flex items-center gap-3">
-                    {tx.status !== 'published' ? (
-                      <button
-                        className="text-sm text-blue-700 disabled:opacity-50"
-                        onClick={() => publishTransaction(tx.id)}
-                        disabled={publishingId === tx.id || deletingId === tx.id}
-                      >
-                        {publishingId === tx.id ? 'Publishing...' : 'Publish'}
-                      </button>
-                    ) : null}
+                    <button
+                      className="text-sm text-blue-700 disabled:opacity-50"
+                      onClick={() => publishTransaction(tx.id)}
+                      disabled={publishingId === tx.id || deletingId === tx.id}
+                    >
+                      {publishingId === tx.id
+                        ? 'Publishing...'
+                        : tx.status === 'published'
+                          ? 'Republish'
+                          : 'Publish'}
+                    </button>
                     {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
                       <span className="text-xs text-red-600" title={tx.raw_payload.publish_error}>
                         Error
