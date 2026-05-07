@@ -9,8 +9,8 @@ export const monarchPublisher: Publisher = {
         amount: tx.amount,
         merchantName: tx.merchantRaw,
         category: tx.category,
-        date: tx.occurredAt,
-        notes: `Ref: ${tx.bankRefId} | INR: ${tx.amount.toFixed(2)}`,
+        date: tx.emailReceivedAt,
+        notes: `Label: upi-ingestor | Ref: ${tx.bankRefId} | INR: ${tx.amount.toFixed(2)}`,
       })
       return { success: true, externalId: id }
     } catch (error) {
