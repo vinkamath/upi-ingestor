@@ -16,6 +16,8 @@ type Tx = {
   }
 }
 
+type TxStatusFilter = 'all' | Tx['status']
+
 type MonarchCategoryOption = {
   id: string
   name: string
@@ -28,6 +30,7 @@ export default function TransactionsPage() {
   const [usdPerInr, setUsdPerInr] = useState<number | null>(null)
   const [rateDate, setRateDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('all')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
@@ -156,6 +159,7 @@ export default function TransactionsPage() {
   }, [])
 
   const usdToInr = usdPerInr && usdPerInr > 0 ? 1 / usdPerInr : null
+  const filteredTxs = txs.filter((tx) => (statusFilter === 'all' ? true : tx.status === statusFilter))
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
@@ -174,6 +178,23 @@ export default function TransactionsPage() {
           ? `FX rate: 1 USD = ${usdToInr.toFixed(2)} INR${rateDate ? ` (as of ${rateDate})` : ''}`
           : 'FX rate: unavailable'}
       </p>
+      <div className="flex items-center gap-2">
+        <label htmlFor="status-filter" className="text-sm text-gray-700">
+          Status:
+        </label>
+        <select
+          id="status-filter"
+          className="border rounded px-2 py-1 text-sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as TxStatusFilter)}
+        >
+          <option value="all">All</option>
+          <option value="pending">Pending</option>
+          <option value="needs_review">Needs review</option>
+          <option value="failed">Failed</option>
+          <option value="published">Published</option>
+        </select>
+      </div>
       {fetchMessage ? <p className="text-sm text-gray-600">{fetchMessage}</p> : null}
 
       <div className="rounded-lg border bg-white overflow-x-auto">
@@ -190,7 +211,7 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {txs.map((tx) => (
+            {filteredTxs.map((tx) => (
               <tr key={tx.id} className="border-t">
                 <td className="p-2">{new Date(tx.email_received_at ?? tx.occurred_at).toLocaleString()}</td>
                 <td className="p-2">{tx.merchant_raw}</td>
@@ -279,10 +300,10 @@ export default function TransactionsPage() {
                 </td>
               </tr>
             ))}
-            {txs.length === 0 ? (
+            {filteredTxs.length === 0 ? (
               <tr>
                 <td className="p-4 text-sm text-gray-500" colSpan={7}>
-                  No transactions yet. Click Fetch Gmail now to test ingestion.
+                  No matching transactions for this status filter.
                 </td>
               </tr>
             ) : null}

@@ -146,6 +146,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
           : new Date().toISOString()
         parsed.push({
           ...tx,
+          occurredAt: emailReceivedAt,
           emailReceivedAt,
         })
       } else {
