@@ -1,5 +1,6 @@
 import { getUser } from '@/lib/db/server'
 import { publishers } from '@/lib/publishers'
+import { learnMerchantMapping } from '@/lib/merchant-mappings'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user } = await getUser()
@@ -17,11 +18,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const category = body.category?.trim() || tx.category
   if (!category) return Response.json({ error: 'Cannot publish without a category' }, { status: 400 })
 
+  await learnMerchantMapping({
+    supabase,
+    userId: user.id,
+    merchantRaw: tx.merchant_raw,
+    category,
+  })
+
   const publish = await publishers.monarch.publish(user.id, {
     amount: Number(tx.amount),
     merchantRaw: tx.merchant_raw,
     merchantNormalized: tx.merchant_normalized,
     occurredAt: tx.occurred_at,
+    emailReceivedAt: tx.email_received_at ?? tx.occurred_at,
     bankRefId: tx.bank_ref_id,
     sourceMessageId: tx.source_message_id,
     currency: 'INR',

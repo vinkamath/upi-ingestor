@@ -74,7 +74,8 @@ export async function GET() {
   const fxUsdPerInrRaw = monarchConnection?.fx_usd_per_inr
   const fxUsdPerInr = fxUsdPerInrRaw == null ? null : Number(fxUsdPerInrRaw)
   const today = ymdUtc(new Date())
-  let resolvedUsdPerInr = Number.isFinite(fxUsdPerInr) && fxUsdPerInr > 0 ? fxUsdPerInr : null
+  let resolvedUsdPerInr =
+    Number.isFinite(fxUsdPerInr ?? Number.NaN) && (fxUsdPerInr ?? 0) > 0 ? fxUsdPerInr : null
   let resolvedRateDate = monarchConnection?.fx_rate_date ?? null
 
   if (!resolvedUsdPerInr || resolvedRateDate !== today) {

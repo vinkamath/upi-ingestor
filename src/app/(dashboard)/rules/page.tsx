@@ -16,9 +16,9 @@ type MonarchCategoryOption = {
   name: string
 }
 
-const empty = {
-  match_type: 'contains' as const,
-  field: 'merchant' as const,
+const empty: Omit<Rule, 'id'> = {
+  match_type: 'contains',
+  field: 'merchant',
   pattern: '',
   category: '',
   priority: 100,
@@ -26,7 +26,7 @@ const empty = {
 
 export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([])
-  const [draft, setDraft] = useState(empty)
+  const [draft, setDraft] = useState<Omit<Rule, 'id'>>(empty)
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Omit<Rule, 'id'> | null>(null)
   const [categories, setCategories] = useState<MonarchCategoryOption[]>([])

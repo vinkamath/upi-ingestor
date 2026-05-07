@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { normalizeMerchant } from '@/lib/categorizer/normalize'
 import { publishers } from '@/lib/publishers'
+import { learnMerchantMapping } from '@/lib/merchant-mappings'
 
 export async function POST(request: Request) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -72,9 +72,10 @@ export async function POST(request: Request) {
   if (!tx) return Response.json({ ok: true })
   if (tx.status === 'published') return Response.json({ ok: true })
 
-  await supabase.from('merchant_mappings').upsert({
-    user_id: tx.user_id,
-    merchant_key: normalizeMerchant(tx.merchant_raw),
+  await learnMerchantMapping({
+    supabase,
+    userId: tx.user_id,
+    merchantRaw: tx.merchant_raw,
     category,
   })
 
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     merchantRaw: tx.merchant_raw,
     merchantNormalized: tx.merchant_normalized,
     occurredAt: tx.occurred_at,
+    emailReceivedAt: tx.email_received_at ?? tx.occurred_at,
     bankRefId: tx.bank_ref_id,
     sourceMessageId: tx.source_message_id,
     currency: 'INR',
