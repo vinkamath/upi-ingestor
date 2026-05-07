@@ -1,6 +1,6 @@
 # www.monarch.com — design system pack
 
-> Built from `https://www.monarch.com/for-couples` on 2026-05-07 by [designlang](https://designlang.app) v12.4.0.
+> Built from `https://www.monarch.com/for-couples` plus app dashboard/report/settings/transactions screenshots on 2026-05-07 by [designlang](https://designlang.app) v12.4.0 and manually refined.
 
 A single, polished bundle of every artifact designlang emits for www.monarch.com: tokens, components, a runnable Storybook, a minimal starter, and paste-ready prompts for v0 / Lovable / Cursor / Claude Artifacts.
 
@@ -51,6 +51,16 @@ In Figma → Variables panel → import `tokens/figma-variables.json`.
 ```bash
 cd storybook && npm install && npm run storybook
 ```
+
+## App snapshot addendum
+
+This pack now includes an additional **product-app extension layer** inferred from account dashboard and cash-flow report screens:
+
+- **App chrome tokens:** sidebar/surface/card/border/muted text neutrals for table-heavy UI
+- **Data-viz tokens:** teal line + area fills, green success streams, purple finance streams, and yellow/red alerts
+- **Usage:** use these app/data-viz tokens for authenticated product surfaces, while keeping original brand tokens for marketing surfaces
+
+> Note: app tokens are best-effort visual matches from four screenshots and should be validated against live product CSS before strict parity work.
 
 ## Provenance
 

@@ -26,6 +26,28 @@
   --color-text-3: #ffffff;
   --color-text-4: #fefcfb;
 
+  /* Colors — App UI (from product dashboard) */
+  --color-app-sidebar: #f8f8f8;
+  --color-app-surface: #f8f8f8;
+  --color-app-card: #ffffff;
+  --color-app-border: #e0e0e0;
+  --color-app-muted-text: #909090;
+  --color-app-subtle-text: #a0a0a0;
+  --color-app-divider: #d8d8d8;
+  --color-app-link: #24a6bf;
+  --color-app-cta-soft: #f8b0a0;
+  --color-app-cta-soft-hover: #f8c8b8;
+
+  /* Colors — Data Viz (from reports + charts) */
+  --color-dataviz-line: #24a6bf;
+  --color-dataviz-line-soft: #d0e8f0;
+  --color-dataviz-positive: #2daf6f;
+  --color-dataviz-positive-soft: #d0e8d8;
+  --color-dataviz-finance: #9b5bc6;
+  --color-dataviz-finance-soft: #e0d0f0;
+  --color-dataviz-warning: #f2c94c;
+  --color-dataviz-negative: #e66774;
+
   /* Typography — Families */
   --font-body: 'ABC Oracle', sans-serif;
   --font-body: 'ui-sans-serif', sans-serif;

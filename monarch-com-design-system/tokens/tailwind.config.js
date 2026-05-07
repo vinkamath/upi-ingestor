@@ -52,7 +52,29 @@ export default {
         'neutral-400': '#777573',
         'neutral-500': '#363431',
         background: '#f6f5f3',
-        foreground: '#000000'
+        foreground: '#000000',
+        app: {
+            sidebar: '#f8f8f8',
+            surface: '#f8f8f8',
+            card: '#ffffff',
+            border: '#e0e0e0',
+            mutedText: '#909090',
+            subtleText: '#a0a0a0',
+            divider: '#d8d8d8',
+            link: '#24a6bf',
+            ctaSoft: '#f8b0a0',
+            ctaSoftHover: '#f8c8b8'
+        },
+        dataviz: {
+            line: '#24a6bf',
+            lineSoft: '#d0e8f0',
+            positive: '#2daf6f',
+            positiveSoft: '#d0e8d8',
+            finance: '#9b5bc6',
+            financeSoft: '#e0d0f0',
+            warning: '#f2c94c',
+            negative: '#e66774'
+        }
     },
     fontFamily: {
         body: [

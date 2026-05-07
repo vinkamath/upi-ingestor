@@ -95,6 +95,78 @@
           "$value": "#777573",
           "$type": "color"
         }
+      },
+      "chromeSidebar": {
+        "$value": "#f8f8f8",
+        "$type": "color"
+      },
+      "chromeSurface": {
+        "$value": "#f8f8f8",
+        "$type": "color"
+      },
+      "chromeCard": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "chromeBorder": {
+        "$value": "#e0e0e0",
+        "$type": "color"
+      },
+      "chromeMutedText": {
+        "$value": "#909090",
+        "$type": "color"
+      },
+      "chartTeal": {
+        "$value": "#24a6bf",
+        "$type": "color"
+      },
+      "chartTealSoft": {
+        "$value": "#d0e8f0",
+        "$type": "color"
+      },
+      "chartGreen": {
+        "$value": "#2daf6f",
+        "$type": "color"
+      },
+      "chartGreenSoft": {
+        "$value": "#d0e8d8",
+        "$type": "color"
+      },
+      "chartPurple": {
+        "$value": "#9b5bc6",
+        "$type": "color"
+      },
+      "chartPurpleSoft": {
+        "$value": "#e0d0f0",
+        "$type": "color"
+      },
+      "chartYellow": {
+        "$value": "#f2c94c",
+        "$type": "color"
+      },
+      "chartRed": {
+        "$value": "#e66774",
+        "$type": "color"
+      },
+      "chromeDivider": {
+        "$value": "#d8d8d8",
+        "$type": "color"
+      },
+      "chromeSubtleText": {
+        "$value": "#a0a0a0",
+        "$type": "color"
+      },
+      "controlPeach": {
+        "$value": "#f8b0a0",
+        "$type": "color"
+      },
+      "controlPeachSoft": {
+        "$value": "#f8c8b8",
+        "$type": "color"
+      },
+      "linkTeal": {
+        "$value": "#24a6bf",
+        "$type": "color"
       }
     },
     "spacing": {
@@ -207,6 +279,82 @@
       "text": {
         "body": {
           "$value": "{primitive.color.text.text0}",
+          "$type": "color"
+        }
+      },
+      "app": {
+        "sidebar": {
+          "$value": "{primitive.color.chromeSidebar}",
+          "$type": "color"
+        },
+        "surface": {
+          "$value": "{primitive.color.chromeSurface}",
+          "$type": "color"
+        },
+        "card": {
+          "$value": "{primitive.color.chromeCard}",
+          "$type": "color"
+        },
+        "border": {
+          "$value": "{primitive.color.chromeBorder}",
+          "$type": "color"
+        },
+        "mutedText": {
+          "$value": "{primitive.color.chromeMutedText}",
+          "$type": "color"
+        },
+        "divider": {
+          "$value": "{primitive.color.chromeDivider}",
+          "$type": "color"
+        },
+        "subtleText": {
+          "$value": "{primitive.color.chromeSubtleText}",
+          "$type": "color"
+        },
+        "link": {
+          "$value": "{primitive.color.linkTeal}",
+          "$type": "color"
+        },
+        "ctaSoft": {
+          "$value": "{primitive.color.controlPeach}",
+          "$type": "color"
+        },
+        "ctaSoftHover": {
+          "$value": "{primitive.color.controlPeachSoft}",
+          "$type": "color"
+        }
+      },
+      "dataViz": {
+        "line": {
+          "$value": "{primitive.color.chartTeal}",
+          "$type": "color"
+        },
+        "lineArea": {
+          "$value": "{primitive.color.chartTealSoft}",
+          "$type": "color"
+        },
+        "positive": {
+          "$value": "{primitive.color.chartGreen}",
+          "$type": "color"
+        },
+        "positiveSoft": {
+          "$value": "{primitive.color.chartGreenSoft}",
+          "$type": "color"
+        },
+        "finance": {
+          "$value": "{primitive.color.chartPurple}",
+          "$type": "color"
+        },
+        "financeSoft": {
+          "$value": "{primitive.color.chartPurpleSoft}",
+          "$type": "color"
+        },
+        "warning": {
+          "$value": "{primitive.color.chartYellow}",
+          "$type": "color"
+        },
+        "negative": {
+          "$value": "{primitive.color.chartRed}",
           "$type": "color"
         }
       }

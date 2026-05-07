@@ -75,6 +75,78 @@
     "text-4": {
       "$value": "#fefcfb",
       "$type": "color"
+    },
+    "app-sidebar": {
+      "$value": "#f8f8f8",
+      "$type": "color"
+    },
+    "app-surface": {
+      "$value": "#f8f8f8",
+      "$type": "color"
+    },
+    "app-card": {
+      "$value": "#ffffff",
+      "$type": "color"
+    },
+    "app-border": {
+      "$value": "#e0e0e0",
+      "$type": "color"
+    },
+    "app-muted-text": {
+      "$value": "#909090",
+      "$type": "color"
+    },
+    "dataviz-line": {
+      "$value": "#24a6bf",
+      "$type": "color"
+    },
+    "dataviz-line-soft": {
+      "$value": "#d0e8f0",
+      "$type": "color"
+    },
+    "dataviz-positive": {
+      "$value": "#2daf6f",
+      "$type": "color"
+    },
+    "dataviz-positive-soft": {
+      "$value": "#d0e8d8",
+      "$type": "color"
+    },
+    "dataviz-finance": {
+      "$value": "#9b5bc6",
+      "$type": "color"
+    },
+    "dataviz-finance-soft": {
+      "$value": "#e0d0f0",
+      "$type": "color"
+    },
+    "dataviz-warning": {
+      "$value": "#f2c94c",
+      "$type": "color"
+    },
+    "dataviz-negative": {
+      "$value": "#e66774",
+      "$type": "color"
+    },
+    "app-divider": {
+      "$value": "#d8d8d8",
+      "$type": "color"
+    },
+    "app-subtle-text": {
+      "$value": "#a0a0a0",
+      "$type": "color"
+    },
+    "app-link": {
+      "$value": "#24a6bf",
+      "$type": "color"
+    },
+    "app-cta-soft": {
+      "$value": "#f8b0a0",
+      "$type": "color"
+    },
+    "app-cta-soft-hover": {
+      "$value": "#f8c8b8",
+      "$type": "color"
     }
   },
   "fontFamily": {
