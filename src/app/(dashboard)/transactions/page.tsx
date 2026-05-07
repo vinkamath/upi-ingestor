@@ -31,8 +31,10 @@ export default function TransactionsPage() {
   const [rateDate, setRateDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('all')
+  const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [publishingAll, setPublishingAll] = useState(false)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [fetchMessage, setFetchMessage] = useState<string | null>(null)
 
@@ -49,6 +51,13 @@ export default function TransactionsPage() {
       const next = { ...prev }
       for (const tx of rows as Tx[]) {
         next[tx.id] = prev[tx.id] ?? tx.category ?? ''
+      }
+      return next
+    })
+    setSelectedIds((prev) => {
+      const next = { ...prev }
+      for (const tx of rows as Tx[]) {
+        if (next[tx.id] == null) next[tx.id] = false
       }
       return next
     })
@@ -126,6 +135,79 @@ export default function TransactionsPage() {
     setFetchMessage('Category updated.')
   }
 
+  async function saveSelectedCategories() {
+    const ids = filteredTxs.map((tx) => tx.id).filter((id) => selectedIds[id])
+    if (ids.length === 0) {
+      setFetchMessage('Select at least one transaction.')
+      return
+    }
+
+    setSavingCategoryId('__bulk__')
+    let successCount = 0
+    let failCount = 0
+
+    for (const id of ids) {
+      const category = categoryDrafts[id]?.trim()
+      if (!category) {
+        failCount += 1
+        continue
+      }
+
+      try {
+        const res = await fetch(`/api/transactions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category }),
+        })
+        if (res.ok) successCount += 1
+        else failCount += 1
+      } catch {
+        failCount += 1
+      }
+    }
+
+    await load()
+    setSavingCategoryId(null)
+    setFetchMessage(
+      failCount === 0
+        ? `Saved category for ${successCount} transaction(s).`
+        : `Saved category for ${successCount} transaction(s). ${failCount} failed.`
+    )
+  }
+
+  async function deleteSelectedTransactions() {
+    const ids = filteredTxs.map((tx) => tx.id).filter((id) => selectedIds[id])
+    if (ids.length === 0) {
+      setFetchMessage('Select at least one transaction.')
+      return
+    }
+
+    const shouldDelete = window.confirm(`Delete ${ids.length} transaction(s)? You can refetch them from Gmail.`)
+    if (!shouldDelete) return
+
+    setDeletingId('__bulk__')
+    let successCount = 0
+    let failCount = 0
+
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+        if (res.ok) successCount += 1
+        else failCount += 1
+      } catch {
+        failCount += 1
+      }
+    }
+
+    await load()
+    setDeletingId(null)
+    setFetchMessage(
+      failCount === 0
+        ? `Deleted ${successCount} transaction(s).`
+        : `Deleted ${successCount} transaction(s). ${failCount} failed.`
+    )
+  }
+
   async function publishTransaction(id: string) {
     const category = categoryDrafts[id]?.trim()
     if (!category) {
@@ -160,6 +242,46 @@ export default function TransactionsPage() {
 
   const usdToInr = usdPerInr && usdPerInr > 0 ? 1 / usdPerInr : null
   const filteredTxs = txs.filter((tx) => (statusFilter === 'all' ? true : tx.status === statusFilter))
+  const selectedCount = filteredTxs.reduce((count, tx) => count + (selectedIds[tx.id] ? 1 : 0), 0)
+  const allSelected = filteredTxs.length > 0 && selectedCount === filteredTxs.length
+
+  async function publishAllVisible() {
+    const eligible = filteredTxs
+      .filter((tx) => tx.status !== 'published')
+      .map((tx) => ({ id: tx.id, category: categoryDrafts[tx.id]?.trim() }))
+      .filter((row): row is { id: string; category: string } => Boolean(row.category))
+
+    if (eligible.length === 0) {
+      setFetchMessage('No unpublished transactions with an assigned category in the current view.')
+      return
+    }
+
+    setPublishingAll(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const row of eligible) {
+      try {
+        const res = await fetch(`/api/transactions/${row.id}/republish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: row.category }),
+        })
+        if (res.ok) successCount += 1
+        else failCount += 1
+      } catch {
+        failCount += 1
+      }
+    }
+
+    await load()
+    setPublishingAll(false)
+    setFetchMessage(
+      failCount === 0
+        ? `Published ${successCount} transaction(s).`
+        : `Published ${successCount} transaction(s). ${failCount} failed.`
+    )
+  }
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
@@ -178,7 +300,8 @@ export default function TransactionsPage() {
           ? `FX rate: 1 USD = ${usdToInr.toFixed(2)} INR${rateDate ? ` (as of ${rateDate})` : ''}`
           : 'FX rate: unavailable'}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
         <label htmlFor="status-filter" className="text-sm text-gray-700">
           Status:
         </label>
@@ -194,6 +317,42 @@ export default function TransactionsPage() {
           <option value="failed">Failed</option>
           <option value="published">Published</option>
         </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
+            onClick={saveSelectedCategories}
+            disabled={
+              publishingAll ||
+              Boolean(publishingId) ||
+              Boolean(deletingId) ||
+              Boolean(savingCategoryId) ||
+              selectedCount === 0
+            }
+          >
+            {savingCategoryId === '__bulk__' ? 'Saving categories...' : `Save category (${selectedCount})`}
+          </button>
+          <button
+            className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
+            onClick={deleteSelectedTransactions}
+            disabled={
+              publishingAll ||
+              Boolean(publishingId) ||
+              Boolean(deletingId) ||
+              Boolean(savingCategoryId) ||
+              selectedCount === 0
+            }
+          >
+            {deletingId === '__bulk__' ? 'Deleting...' : `Delete (${selectedCount})`}
+          </button>
+        <button
+          className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
+          onClick={publishAllVisible}
+          disabled={publishingAll || Boolean(publishingId) || Boolean(deletingId) || Boolean(savingCategoryId)}
+        >
+          {publishingAll ? 'Publishing all...' : 'Publish all'}
+        </button>
+        </div>
       </div>
       {fetchMessage ? <p className="text-sm text-gray-600">{fetchMessage}</p> : null}
 
@@ -201,6 +360,21 @@ export default function TransactionsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
+              <th className="text-left p-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible transactions"
+                  checked={allSelected}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setSelectedIds((prev) => {
+                      const next = { ...prev }
+                      for (const tx of filteredTxs) next[tx.id] = checked
+                      return next
+                    })
+                  }}
+                />
+              </th>
               <th className="text-left p-2">Date</th>
               <th className="text-left p-2">Merchant</th>
               <th className="text-left p-2">Amount</th>
@@ -213,6 +387,19 @@ export default function TransactionsPage() {
           <tbody>
             {filteredTxs.map((tx) => (
               <tr key={tx.id} className="border-t">
+                <td className="p-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select transaction ${tx.id}`}
+                    checked={Boolean(selectedIds[tx.id])}
+                    onChange={(e) =>
+                      setSelectedIds((prev) => ({
+                        ...prev,
+                        [tx.id]: e.target.checked,
+                      }))
+                    }
+                  />
+                </td>
                 <td className="p-2">{new Date(tx.email_received_at ?? tx.occurred_at).toLocaleString()}</td>
                 <td className="p-2">{tx.merchant_raw}</td>
                 <td className="p-2">
@@ -277,20 +464,6 @@ export default function TransactionsPage() {
                         {publishingId === tx.id ? 'Publishing...' : 'Publish'}
                       </button>
                     ) : null}
-                    <button
-                      className="text-sm text-gray-700 disabled:opacity-50"
-                      onClick={() => saveCategory(tx.id)}
-                      disabled={savingCategoryId === tx.id || deletingId === tx.id || publishingId === tx.id}
-                    >
-                      {savingCategoryId === tx.id ? 'Saving...' : 'Save category'}
-                    </button>
-                    <button
-                      className="text-sm text-red-600 disabled:opacity-50"
-                      onClick={() => deleteTransaction(tx.id)}
-                      disabled={deletingId === tx.id || publishingId === tx.id || savingCategoryId === tx.id}
-                    >
-                      {deletingId === tx.id ? 'Deleting...' : 'Delete'}
-                    </button>
                     {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
                       <span className="text-xs text-red-600" title={tx.raw_payload.publish_error}>
                         Error
@@ -302,7 +475,7 @@ export default function TransactionsPage() {
             ))}
             {filteredTxs.length === 0 ? (
               <tr>
-                <td className="p-4 text-sm text-gray-500" colSpan={7}>
+                <td className="p-4 text-sm text-gray-500" colSpan={8}>
                   No matching transactions for this status filter.
                 </td>
               </tr>
