@@ -33,7 +33,6 @@ export default function TransactionsPage() {
   const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('all')
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [publishingId, setPublishingId] = useState<string | null>(null)
   const [publishingAll, setPublishingAll] = useState(false)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [fetchMessage, setFetchMessage] = useState<string | null>(null)
@@ -208,30 +207,6 @@ export default function TransactionsPage() {
     )
   }
 
-  async function publishTransaction(id: string) {
-    const category = categoryDrafts[id]?.trim()
-    if (!category) {
-      setFetchMessage('Pick a category first.')
-      return
-    }
-
-    setPublishingId(id)
-    const res = await fetch(`/api/transactions/${id}/republish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category }),
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      setFetchMessage(json?.error ?? 'Failed to publish transaction. Please try again.')
-      setPublishingId(null)
-      return
-    }
-    await load()
-    setPublishingId(null)
-    setFetchMessage(json?.message ?? 'Transaction published successfully.')
-  }
-
   useEffect(() => {
     const id = window.setTimeout(() => {
       void load()
@@ -362,7 +337,6 @@ export default function TransactionsPage() {
             onClick={saveSelectedCategories}
             disabled={
               publishingAll ||
-              Boolean(publishingId) ||
               Boolean(deletingId) ||
               Boolean(savingCategoryId) ||
               selectedCount === 0
@@ -375,7 +349,6 @@ export default function TransactionsPage() {
             onClick={deleteSelectedTransactions}
             disabled={
               publishingAll ||
-              Boolean(publishingId) ||
               Boolean(deletingId) ||
               Boolean(savingCategoryId) ||
               selectedCount === 0
@@ -388,7 +361,6 @@ export default function TransactionsPage() {
             onClick={publishSelectedTransactions}
             disabled={
               publishingAll ||
-              Boolean(publishingId) ||
               Boolean(deletingId) ||
               Boolean(savingCategoryId) ||
               selectedCount === 0
@@ -399,7 +371,7 @@ export default function TransactionsPage() {
           <button
             className="rounded border px-3 py-2 text-sm bg-white disabled:opacity-50"
             onClick={publishAllVisible}
-            disabled={publishingAll || Boolean(publishingId) || Boolean(deletingId) || Boolean(savingCategoryId)}
+            disabled={publishingAll || Boolean(deletingId) || Boolean(savingCategoryId)}
           >
             {publishingAll ? 'Publishing all...' : 'Publish all visible'}
           </button>
@@ -432,7 +404,6 @@ export default function TransactionsPage() {
               <th className="text-left p-2">Category</th>
               <th className="text-left p-2">Status</th>
               <th className="text-left p-2">Ref</th>
-              <th className="text-left p-2">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -504,31 +475,11 @@ export default function TransactionsPage() {
                   )}
                 </td>
                 <td className="p-2">{tx.bank_ref_id.slice(0, 12)}</td>
-                <td className="p-2">
-                  <div className="flex items-center gap-3">
-                    <button
-                      className="text-sm text-blue-700 disabled:opacity-50"
-                      onClick={() => publishTransaction(tx.id)}
-                      disabled={publishingId === tx.id || deletingId === tx.id}
-                    >
-                      {publishingId === tx.id
-                        ? 'Publishing...'
-                        : tx.status === 'published'
-                          ? 'Republish'
-                          : 'Publish'}
-                    </button>
-                    {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
-                      <span className="text-xs text-red-600" title={tx.raw_payload.publish_error}>
-                        Error
-                      </span>
-                    ) : null}
-                  </div>
-                </td>
               </tr>
             ))}
             {filteredTxs.length === 0 ? (
               <tr>
-                <td className="p-4 text-sm text-gray-500" colSpan={8}>
+                <td className="p-4 text-sm text-gray-500" colSpan={7}>
                   No matching transactions for this status filter.
                 </td>
               </tr>
