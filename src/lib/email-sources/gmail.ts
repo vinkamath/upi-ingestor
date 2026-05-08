@@ -78,6 +78,12 @@ export type GmailFetchResult = {
     skippedNoBody: number
     skippedParseFailure: number
     sampleSubjects: string[]
+    parseErrors: Array<{
+      messageId: string
+      subject: string
+      from: string
+      reason: 'missing_or_invalid_required_fields'
+    }>
   }
 }
 
@@ -99,6 +105,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
         skippedNoBody: 0,
         skippedParseFailure: 0,
         sampleSubjects: [],
+        parseErrors: [],
       },
     }
   }
@@ -123,6 +130,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
     const sampleSubjects: string[] = []
     let skippedNoBody = 0
     let skippedParseFailure = 0
+    const parseErrors: GmailFetchResult['debug']['parseErrors'] = []
 
     for (const message of messages) {
       if (!message.id) continue
@@ -151,6 +159,12 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
         })
       } else {
         skippedParseFailure += 1
+        parseErrors.push({
+          messageId: message.id,
+          subject,
+          from,
+          reason: 'missing_or_invalid_required_fields',
+        })
       }
     }
 
@@ -163,6 +177,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
         skippedNoBody,
         skippedParseFailure,
         sampleSubjects,
+        parseErrors,
       },
     }
   } catch (error) {
@@ -176,6 +191,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
         skippedNoBody: 0,
         skippedParseFailure: 0,
         sampleSubjects: [],
+        parseErrors: [],
       },
     }
   }

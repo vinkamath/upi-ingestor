@@ -18,8 +18,42 @@ export async function processUserTransactions(userId: string) {
     failed: 0,
     skippedNoBody: fetched.debug.skippedNoBody,
     skippedParseFailure: fetched.debug.skippedParseFailure,
+    parseErrors: fetched.debug.parseErrors,
     query: fetched.debug.query,
     sampleSubjects: fetched.debug.sampleSubjects,
+  }
+
+  if (summary.parseErrors.length > 0) {
+    const { data: tgLink } = await supabase
+      .from('telegram_links')
+      .select('chat_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (tgLink?.chat_id) {
+      const preview = summary.parseErrors
+        .slice(0, 3)
+        .map((error, idx) => `${idx + 1}. ${error.subject}`)
+        .join('\n')
+
+      const moreCount = summary.parseErrors.length - 3
+      const moreLine = moreCount > 0 ? `\n…and ${moreCount} more.` : ''
+
+      try {
+        await sendTelegramMessage(
+          tgLink.chat_id,
+          [
+            `Parse alert: ${summary.parseErrors.length} Gmail message(s) could not be parsed.`,
+            'Required fields missing/invalid: amount, merchant, reference, or date.',
+            preview ? `Examples:\n${preview}${moreLine}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n\n')
+        )
+      } catch (error) {
+        console.error('pipeline.telegram_parse_alert_failed', { userId, error })
+      }
+    }
   }
 
   for (const tx of txs) {
