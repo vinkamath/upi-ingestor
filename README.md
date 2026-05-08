@@ -35,3 +35,4 @@ Next.js + Supabase app that parses UPI transaction emails from Gmail, categorize
 - Gmail parsing currently includes an initial HDFC-focused parser in `src/lib/parsers/hdfc.ts`.
 - Unknown categories trigger Telegram inline prompts and persist learned `merchant_mappings`.
 - Monarch integration uses a minimal GraphQL publisher surface and is intentionally adapter-based so other publishers can be added.
+- Vercel Hobby cron jobs must run at most once per day. Current schedule is configured in `vercel.json` as a daily run.
