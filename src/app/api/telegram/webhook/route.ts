@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { publishers } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
+import { sendTelegramMessage } from '@/lib/telegram/client'
 
 export async function POST(request: Request) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -36,6 +37,24 @@ export async function POST(request: Request) {
         .from('telegram_links')
         .update({ chat_id: chatId, linked_at: new Date().toISOString() })
         .eq('link_code', linkCode)
+
+      try {
+        await sendTelegramMessage(
+          chatId,
+          'Linked successfully. You will now receive transaction notifications here.'
+        )
+      } catch (error) {
+        console.error('telegram.link_success_reply_failed', { chatId, error })
+      }
+    } else {
+      try {
+        await sendTelegramMessage(
+          chatId,
+          'Invalid or expired link code. Please generate a new code from Settings and try again.'
+        )
+      } catch (error) {
+        console.error('telegram.link_invalid_reply_failed', { chatId, error })
+      }
     }
 
     return Response.json({ ok: true })
