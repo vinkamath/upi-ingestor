@@ -8,7 +8,7 @@ export async function POST() {
   const { error } = await supabase.from('telegram_links').upsert({
     user_id: user.id,
     link_code: linkCode,
-  })
+  }, { onConflict: 'user_id' })
 
   if (error) return Response.json({ error: error.message }, { status: 400 })
   return Response.json({ linkCode })
