@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   description: 'Parse UPI transactions from Gmail and publish to Monarch',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{

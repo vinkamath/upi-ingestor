@@ -125,7 +125,7 @@ export default function RulesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5 md:space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-[28px] leading-tight tracking-[-0.5px] text-foreground">
           Categorization Rules
@@ -147,7 +147,7 @@ export default function RulesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-[12px]">Match type</Label>
               <select
@@ -261,7 +261,7 @@ export default function RulesPage() {
                 {index > 0 && <Separator className="bg-border/60" />}
                 {editingRuleId === rule.id && editDraft ? (
                   <div className="p-4 space-y-3 bg-muted/30">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-[11px]">Match type</Label>
                         <select
@@ -357,7 +357,7 @@ export default function RulesPage() {
                         </code>
                       </p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 ml-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 shrink-0 ml-3 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"

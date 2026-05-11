@@ -112,7 +112,7 @@ export default function SettingsPage() {
   }, [])
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5 md:space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-[28px] leading-tight tracking-[-0.5px] text-foreground">Connections</h1>
         <p className="text-[13px] text-muted-foreground mt-0.5">
@@ -123,7 +123,7 @@ export default function SettingsPage() {
       {/* Gmail */}
       <Card className="shadow-sm border-border">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-y-2">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                 <Mail className="h-4 w-4 text-muted-foreground" />
@@ -150,7 +150,7 @@ export default function SettingsPage() {
       {/* Monarch */}
       <Card className="shadow-sm border-border">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-y-2">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                 <Landmark className="h-4 w-4 text-muted-foreground" />
