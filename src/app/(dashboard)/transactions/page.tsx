@@ -58,6 +58,11 @@ const STATUS_CONFIG: Record<
   },
 }
 
+const chevronSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
+const chevronStyle = { backgroundImage: chevronSvg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }
+const chevronSmallSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
+const chevronSmallStyle = { backgroundImage: chevronSmallSvg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }
+
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
   const [categories, setCategories] = useState<MonarchCategoryOption[]>([])
@@ -275,13 +280,39 @@ export default function TransactionsPage() {
   const allSelected = filteredTxs.length > 0 && selectedCount === filteredTxs.length
   const isBusy = isLoading || publishingAll || Boolean(deletingId) || Boolean(savingCategoryId)
 
+  function CategoryField({ txId, category }: { txId: string; category: string | null }) {
+    if (categories.length > 0) {
+      return (
+        <select
+          className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
+          style={chevronSmallStyle}
+          value={categoryDrafts[txId] ?? category ?? ''}
+          onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [txId]: e.target.value }))}
+        >
+          <option value="" disabled>Select category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+      )
+    }
+    return (
+      <input
+        className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 focus:outline-none focus:ring-2 focus:ring-ring"
+        placeholder="Category"
+        value={categoryDrafts[txId] ?? category ?? ''}
+        onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [txId]: e.target.value }))}
+      />
+    )
+  }
+
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-[28px] leading-tight tracking-[-0.5px] text-foreground">Transactions</h1>
-          <p className="text-[13px] text-muted-foreground mt-0.5">
+          <h1 className="text-[24px] md:text-[28px] leading-tight tracking-[-0.5px] text-foreground">Transactions</h1>
+          <p className="text-[12px] md:text-[13px] text-muted-foreground mt-0.5">
             {usdToInr
               ? `1 USD = ${usdToInr.toFixed(2)} INR${rateDate ? ` · ${rateDate}` : ''}`
               : 'FX rate unavailable'}
@@ -295,21 +326,22 @@ export default function TransactionsPage() {
           className="gap-2 shrink-0"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
-          {isLoading ? 'Loading…' : 'Fetch Gmail'}
+          <span className="hidden sm:inline">{isLoading ? 'Loading…' : 'Fetch Gmail'}</span>
+          <span className="sm:hidden">{isLoading ? '…' : 'Fetch'}</span>
         </Button>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="space-y-2">
         {/* Status filter */}
         <div className="flex items-center gap-2">
-          <label htmlFor="status-filter" className="text-[13px] text-muted-foreground">
+          <label htmlFor="status-filter" className="text-[13px] text-muted-foreground shrink-0">
             Status
           </label>
           <select
             id="status-filter"
             className="h-8 rounded-lg border border-border bg-card text-[13px] text-foreground px-2 pr-7 focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+            style={chevronStyle}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as TxStatusFilter)}
           >
@@ -321,14 +353,14 @@ export default function TransactionsPage() {
           </select>
         </div>
 
-        {/* Bulk actions */}
-        <div className="flex items-center gap-2">
+        {/* Bulk actions — horizontally scrollable on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:flex-wrap">
           <Button
             variant="outline"
             size="sm"
             onClick={saveSelectedCategories}
             disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-[13px] shrink-0"
           >
             <CheckSquare className="h-3.5 w-3.5" />
             {savingCategoryId === '__bulk__' ? 'Saving…' : `Save (${selectedCount})`}
@@ -338,7 +370,7 @@ export default function TransactionsPage() {
             size="sm"
             onClick={deleteSelectedTransactions}
             disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px] text-destructive hover:text-destructive"
+            className="gap-1.5 text-[13px] shrink-0 text-destructive hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {deletingId === '__bulk__' ? 'Deleting…' : `Delete (${selectedCount})`}
@@ -348,7 +380,7 @@ export default function TransactionsPage() {
             size="sm"
             onClick={publishSelectedTransactions}
             disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-[13px] shrink-0"
           >
             <Upload className="h-3.5 w-3.5" />
             {publishingAll ? 'Publishing…' : `Publish (${selectedCount})`}
@@ -358,7 +390,7 @@ export default function TransactionsPage() {
             size="sm"
             onClick={publishAllVisible}
             disabled={isBusy}
-            className="gap-1.5 text-[13px]"
+            className="gap-1.5 text-[13px] shrink-0"
           >
             <Upload className="h-3.5 w-3.5" />
             {publishingAll ? 'Publishing…' : 'Publish all'}
@@ -368,14 +400,14 @@ export default function TransactionsPage() {
 
       {/* Status message */}
       {fetchMessage && (
-        <div className="flex items-center gap-2 rounded-lg bg-card border border-border px-4 py-2.5 text-[13px] text-foreground">
-          <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          {fetchMessage}
+        <div className="flex items-start gap-2 rounded-lg bg-card border border-border px-4 py-2.5 text-[13px] text-foreground">
+          <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+          <span>{fetchMessage}</span>
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      {/* Desktop table */}
+      <div className="hidden md:block rounded-xl border border-border bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
@@ -441,34 +473,7 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {categories.length > 0 ? (
-                    <select
-                      className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring appearance-none min-w-[180px]"
-                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                      value={categoryDrafts[tx.id] ?? tx.category ?? ''}
-                      onChange={(e) =>
-                        setCategoryDrafts((prev) => ({ ...prev, [tx.id]: e.target.value }))
-                      }
-                    >
-                      <option value="" disabled>
-                        Select category
-                      </option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.name}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 focus:outline-none focus:ring-2 focus:ring-ring min-w-[180px]"
-                      placeholder="Category"
-                      value={categoryDrafts[tx.id] ?? tx.category ?? ''}
-                      onChange={(e) =>
-                        setCategoryDrafts((prev) => ({ ...prev, [tx.id]: e.target.value }))
-                      }
-                    />
-                  )}
+                  <CategoryField txId={tx.id} category={tx.category} />
                 </TableCell>
                 <TableCell>
                   {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
@@ -503,6 +508,105 @@ export default function TransactionsPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-2">
+        {/* Select all */}
+        {filteredTxs.length > 0 && (
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox
+              aria-label="Select all visible transactions"
+              checked={allSelected}
+              onCheckedChange={(checked) => {
+                setSelectedIds((prev) => {
+                  const next = { ...prev }
+                  for (const tx of filteredTxs) next[tx.id] = Boolean(checked)
+                  return next
+                })
+              }}
+            />
+            <span className="text-[12px] text-muted-foreground">Select all</span>
+          </div>
+        )}
+
+        {filteredTxs.map((tx) => (
+          <div
+            key={tx.id}
+            className={cn(
+              'rounded-xl border border-border bg-card p-3 shadow-sm transition-colors',
+              selectedIds[tx.id] && 'border-primary/30 bg-primary/5'
+            )}
+          >
+            {/* Top row: checkbox + merchant + amount + status */}
+            <div className="flex items-start gap-2.5 mb-2.5">
+              <Checkbox
+                aria-label={`Select transaction ${tx.id}`}
+                checked={Boolean(selectedIds[tx.id])}
+                onCheckedChange={(checked) =>
+                  setSelectedIds((prev) => ({ ...prev, [tx.id]: Boolean(checked) }))
+                }
+                className="mt-0.5 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-foreground truncate">{tx.merchant_raw}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {new Date(tx.email_received_at ?? tx.occurred_at).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: '2-digit',
+                  })}
+                  {' · '}
+                  {new Date(tx.email_received_at ?? tx.occurred_at).toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[13px] font-semibold text-foreground">₹{tx.amount.toFixed(0)}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  ${usdPerInr ? Math.abs(tx.amount * usdPerInr).toFixed(2) : '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom row: category + status badge + delete */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <CategoryField txId={tx.id} category={tx.category} />
+              </div>
+              {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
+                <Badge
+                  className={cn('border text-[11px] shrink-0 cursor-help', STATUS_CONFIG[tx.status].className)}
+                  title={tx.raw_payload.publish_error}
+                >
+                  {STATUS_CONFIG[tx.status].label}
+                </Badge>
+              ) : (
+                <Badge className={cn('border text-[11px] shrink-0', STATUS_CONFIG[tx.status].className)}>
+                  {STATUS_CONFIG[tx.status].label}
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={() => deleteTransaction(tx.id)}
+                disabled={isBusy}
+                aria-label="Delete transaction"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        ))}
+
+        {filteredTxs.length === 0 && (
+          <div className="rounded-xl border border-border bg-card p-8 text-center text-[13px] text-muted-foreground">
+            {isLoading ? 'Loading transactions…' : 'No transactions match this filter.'}
+          </div>
+        )}
       </div>
     </div>
   )
