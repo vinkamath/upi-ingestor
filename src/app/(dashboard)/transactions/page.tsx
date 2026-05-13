@@ -429,7 +429,6 @@ export default function TransactionsPage() {
               <TableHead className="text-[12px] font-medium text-muted-foreground">Amount</TableHead>
               <TableHead className="text-[12px] font-medium text-muted-foreground min-w-[200px]">Category</TableHead>
               <TableHead className="text-[12px] font-medium text-muted-foreground">Status</TableHead>
-              <TableHead className="text-[12px] font-medium text-muted-foreground">Ref</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -494,14 +493,11 @@ export default function TransactionsPage() {
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-[11px] text-muted-foreground font-mono">
-                  {tx.bank_ref_id.slice(0, 12)}
-                </TableCell>
               </TableRow>
             ))}
             {filteredTxs.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-[13px] text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-[13px] text-muted-foreground">
                   {isLoading ? 'Loading transactions…' : 'No transactions match this filter.'}
                 </TableCell>
               </TableRow>
