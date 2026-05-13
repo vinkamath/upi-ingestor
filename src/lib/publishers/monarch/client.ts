@@ -138,16 +138,14 @@ export async function createMonarchTransaction(userId: string, payload: {
 }) {
   const auth = await getMonarchAuth(userId)
 
-  if (!process.env.MONARCH_GRAPHQL_URL) {
-    throw new Error('MONARCH_GRAPHQL_URL not set')
-  }
+  const graphqlUrl = process.env.MONARCH_GRAPHQL_URL ?? 'https://api.monarch.com/graphql'
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 10000)
 
   try {
     const executeGraphql = async (query: string, variables: Record<string, unknown>) => {
-      const response = await fetch(process.env.MONARCH_GRAPHQL_URL!, {
+      const response = await fetch(graphqlUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

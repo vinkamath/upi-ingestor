@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Architecture — UPI Ingestor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Lora:wght@500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --primary:      #ff692d;
+    --background:   #f6f5f3;
+    --surface:      #ffffff;
+    --foreground:   #22201d;
+    --muted:        #777573;
+    --border:       #e0e0e0;
+    --positive:     #2daf6f;
+    --destructive:  #e66774;
+    --warning:      #f2c94c;
+    --sidebar:      #f8f8f8;
+    --font-body:    'DM Sans', sans-serif;
+    --font-display: 'Lora', serif;
+    --font-mono:    'DM Mono', monospace;
+    --radius:       10px;
+    --shadow:       0 1px 3px rgba(34,32,29,0.08), 0 1px 2px rgba(34,32,29,0.04);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* ── Header ── */
+  .site-header {
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 24px;
+    margin-bottom: 48px;
+  }
+  .site-header .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+  .site-header h1 {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-weight: 600;
+    color: var(--foreground);
+    line-height: 1.2;
+  }
+  .site-header .subtitle {
+    color: var(--muted);
+    margin-top: 6px;
+    font-size: 14px;
+  }
+  .site-header nav { margin-top: 16px; }
+  .site-header nav a {
+    display: inline-block;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    margin-right: 20px;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .site-header nav a:hover { border-color: var(--primary); }
+
+  /* ── Sections ── */
+  section { margin-bottom: 56px; }
+  h2 {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--foreground);
+    border-left: 3px solid var(--primary);
+    padding-left: 14px;
+    margin-bottom: 20px;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    margin-top: 28px;
+  }
+  p { margin-bottom: 14px; color: var(--foreground); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+
+  /* ── Pipeline steps ── */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 0 16px;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 40px;
+    bottom: -20px;
+    width: 2px;
+    background: var(--border);
+  }
+  .step + .step { margin-top: 20px; }
+  .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .step-body { padding-top: 8px; padding-bottom: 20px; }
+  .step-body strong { display: block; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .step-body p { color: var(--muted); font-size: 14px; margin-bottom: 0; }
+  .step-body code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 5px;
+    color: var(--primary);
+  }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 16px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  thead { background: var(--foreground); color: var(--background); }
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  tbody tr { border-top: 1px solid var(--border); }
+  tbody tr:hover { background: var(--background); }
+  td { padding: 10px 14px; vertical-align: top; }
+  td code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-orange { background: #fff1eb; color: var(--primary); border: 1px solid #ffd5c2; }
+  .badge-green  { background: #e8f7ef; color: var(--positive); border: 1px solid #b6e8d0; }
+  .badge-yellow { background: #fdf8e3; color: #9a7a00; border: 1px solid #f0dfa0; }
+  .badge-red    { background: #fdf0f1; color: var(--destructive); border: 1px solid #f7c5c9; }
+  .badge-muted  { background: var(--background); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Diagram container ── */
+  .diagram-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  .mermaid { font-family: var(--font-body) !important; }
+
+  /* ── DB schema ── */
+  .schema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .schema-grid { grid-template-columns: 1fr; } }
+  .schema-table-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+  .schema-field {
+    display: flex;
+    gap: 8px;
+    font-size: 12.5px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .schema-field:last-child { border-bottom: none; }
+  .field-name { font-family: var(--font-mono); font-weight: 500; flex-shrink: 0; }
+  .field-type { color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; }
+  .field-note { color: var(--muted); font-size: 11.5px; margin-left: auto; text-align: right; }
+
+  /* ── Callout ── */
+  .callout {
+    border-left: 3px solid var(--primary);
+    background: #fff7f4;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 14px 18px;
+    font-size: 14px;
+    color: var(--foreground);
+    margin-bottom: 20px;
+  }
+  .callout strong { color: var(--primary); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    color: var(--muted);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="site-header">
+    <div class="eyebrow">UPI Ingestor · Documentation</div>
+    <h1>Architecture</h1>
+    <p class="subtitle">How the pipeline moves money data from Gmail to Monarch, with Telegram in the loop.</p>
+    <nav>
+      <a href="../README.md">← README</a>
+      <a href="setup.html">Setup Guide</a>
+    </nav>
+  </header>
+
+  <!-- Overview -->
+  <section>
+    <h2>Overview</h2>
+    <p>
+      UPI Ingestor is a personal finance automation pipeline built as a single Next.js application deployed on Vercel.
+      It has no background workers or queues — the entire flow runs synchronously inside a single Vercel function invocation,
+      triggered either by a daily cron job or a manual fetch from the dashboard.
+    </p>
+    <div class="callout">
+      <strong>Design principle:</strong> Every credential (Gmail OAuth tokens, Monarch password) is encrypted at rest using AES-256-GCM
+      before being stored in Supabase. The <code>ENCRYPTION_KEY</code> never leaves your environment.
+    </div>
+    <p>
+      All database tables use Supabase Row Level Security — every policy is scoped to <code>auth.uid() = user_id</code>,
+      so no user can read another user's transactions or rules, even via the JS client.
+    </p>
+  </section>
+
+  <!-- Pipeline Diagram -->
+  <section>
+    <h2>Pipeline Data Flow</h2>
+    <div class="diagram-card">
+      <pre class="mermaid">
+flowchart LR
+    CRON["⏰ Vercel Cron\nGET /api/cron/poll"]
+    UI["🖥 Web UI\nPOST /api/gmail/fetch-now"]
+
+    CRON --> PIPE
+    UI --> PIPE
+
+    PIPE["pipeline.ts\nprocessUserTransactions()"]
+    PIPE --> GMAIL
+
+    GMAIL["Gmail API\nemail-sources/gmail.ts\nfilter by UPI label"]
+    GMAIL -->|raw email bodies| PARSE
+
+    PARSE["Parser Registry\nparsers/hdfc.ts\namount · merchant · bankRefId"]
+    PARSE -->|ParsedTransaction| DEDUP
+
+    DEDUP{"bank_ref_id\nalready stored?"}
+    DEDUP -->|yes — skip| END1((" "))
+    DEDUP -->|no| INSERT
+
+    INSERT["INSERT transactions\nstatus: pending"]
+    INSERT --> CAT
+
+    CAT{"Categorizer\ncategorizer/engine.ts"}
+    CAT -->|rules match| PUB
+    CAT -->|mapping match| PUB
+    CAT -->|no match| REVIEW
+
+    REVIEW["status: needs_review\n+ pending_reviews row"]
+    REVIEW --> TG
+
+    TG["Telegram Bot\ninline keyboard\n3 categories + manual"]
+    TG -.->|callback_data: cat:txId:cat| WH
+
+    WH["POST /api/telegram/webhook\nsave merchant_mapping\ntrigger republish"]
+    WH --> PUB
+
+    PUB["Monarch Publisher\npublishers/monarch/\nGraphQL createTransaction"]
+    PUB -->|success| DB
+    PUB -->|failure| DB
+
+    INSERT --> DB
+    DB[("Supabase\nPostgres + RLS")]
+
+    classDef trigger fill:#ff692d,stroke:#22201d,color:#f6f5f3,stroke-width:2px
+    classDef core    fill:#22201d,stroke:#ff692d,color:#f6f5f3,stroke-width:1px
+    classDef ext     fill:#2daf6f,stroke:#22201d,color:#f6f5f3,stroke-width:1px
+    classDef store   fill:#f2c94c,stroke:#22201d,color:#22201d,stroke-width:2px
+    classDef silent  fill:#f6f5f3,stroke:#e0e0e0,color:#777573
+
+    class CRON,UI trigger
+    class PIPE,GMAIL,PARSE,DEDUP,INSERT,CAT,REVIEW core
+    class TG,WH,PUB ext
+    class DB store
+    class END1 silent
+      </pre>
+    </div>
+  </section>
+
+  <!-- Step-by-step pipeline -->
+  <section>
+    <h2>Pipeline Steps</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Trigger</strong>
+          <p>
+            The Vercel cron fires <code>GET /api/cron/poll</code> at 3:30 UTC daily (configured in <code>vercel.json</code>).
+            The UI can also trigger <code>POST /api/gmail/fetch-now</code> manually. Both call
+            <code>processUserTransactions(userId)</code> in <code>src/lib/pipeline.ts</code>.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Gmail fetch — <code>email-sources/gmail.ts</code></strong>
+          <p>
+            Loads the user's encrypted Gmail OAuth refresh token from <code>gmail_connections</code>,
+            decrypts it, and calls the Gmail API to list messages matching the <code>GMAIL_FETCH_LABEL</code>
+            (default: <code>UPI</code>) label received within the last <code>GMAIL_FETCH_DAYS_BACK</code> days.
+            Message bodies are fetched individually and passed to the parser registry.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Parsing — <code>parsers/hdfc.ts</code></strong>
+          <p>
+            Each email body is matched against the HDFC parser using regex patterns. The parser extracts
+            <code>amount</code>, <code>merchantRaw</code>, <code>bankRefId</code>, <code>occurredAt</code>,
+            and a normalized merchant key. Messages that don't match are flagged as parse errors and
+            reported via Telegram if a bot is linked. The parser registry (<code>parsers/index.ts</code>)
+            is intentionally additive — new bank parsers can be registered without changing the pipeline.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <strong>Dedup &amp; persist</strong>
+          <p>
+            Each <code>ParsedTransaction</code> is checked against <code>transactions</code> by
+            <code>(user_id, bank_ref_id)</code>. Duplicates are skipped. New transactions are inserted
+            with <code>status: pending</code>.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <strong>Categorization — <code>categorizer/engine.ts</code></strong>
+          <p>
+            Two-pass lookup in priority order:
+          </p>
+          <p>
+            <strong>Pass 1 — Rules:</strong> user-defined rules stored in the <code>rules</code> table.
+            Each rule has a <code>match_type</code> (regex / contains / equals), a target <code>field</code>
+            (merchant / sender / body), and a <code>pattern</code>. Rules are evaluated in ascending
+            <code>priority</code> order; first match wins.
+          </p>
+          <p>
+            <strong>Pass 2 — Merchant mappings:</strong> the normalized merchant key is looked up in
+            <code>merchant_mappings</code>. Mappings are learned when a user responds to a Telegram prompt.
+          </p>
+          <p>
+            If neither pass produces a category, the transaction enters the human-in-the-loop flow.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <strong>Human-in-the-loop — Telegram Bot</strong>
+          <p>
+            Unknown transactions are marked <code>needs_review</code>. A Telegram inline keyboard
+            is sent with the user's three most recently used categories plus a "Type new category"
+            option. A row is inserted into <code>pending_reviews</code> linking the Telegram message
+            to the transaction (7-day TTL).
+          </p>
+          <p>
+            When the user taps a button, <code>POST /api/telegram/webhook</code> receives a
+            <code>callback_query</code> with <code>callback_data: cat:&lt;txId&gt;:&lt;category&gt;</code>.
+            The handler saves a new <code>merchant_mapping</code> and triggers republish.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+          <strong>Publish — <code>publishers/monarch/</code></strong>
+          <p>
+            The Monarch publisher decrypts the user's stored Monarch credential, calls their
+            GraphQL <code>createTransaction</code> mutation, and updates the transaction row with
+            <code>status: published</code> and the returned <code>published_id</code>. On failure,
+            <code>status: failed</code> is set and the error is stored in <code>raw_payload.publish_error</code>
+            for manual retry via <code>POST /api/transactions/:id/republish</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module breakdown -->
+  <section>
+    <h2>Module Reference</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Role</th>
+            <th>Key exports</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>lib/pipeline.ts</code></td>
+            <td>Pipeline orchestrator — runs fetch → parse → categorize → publish for one user</td>
+            <td><code>processUserTransactions(userId)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/email-sources/gmail.ts</code></td>
+            <td>Gmail API client; fetches and decodes messages matching the UPI label</td>
+            <td><code>fetchGmailTransactions(userId)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/parsers/hdfc.ts</code></td>
+            <td>Regex parser for HDFC UPI debit/credit notification emails</td>
+            <td><code>parseHdfc(body)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/parsers/index.ts</code></td>
+            <td>Parser registry — tries all registered parsers; returns first successful parse</td>
+            <td><code>parseEmail(body)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/categorizer/engine.ts</code></td>
+            <td>Two-pass categorization: rules → merchant mappings → unknown</td>
+            <td><code>categorizeTransaction(supabase, userId, tx)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/categorizer/normalize.ts</code></td>
+            <td>Merchant name normalization (lowercasing, punctuation stripping)</td>
+            <td><code>normalizeMerchant(raw)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/merchant-mappings.ts</code></td>
+            <td>CRUD helpers for the learned merchant→category mapping table</td>
+            <td><code>saveMerchantMapping()</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/publishers/monarch/</code></td>
+            <td>Monarch Money GraphQL publisher; handles credential decryption and mutation</td>
+            <td><code>publisher.publish(userId, tx)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/telegram/client.ts</code></td>
+            <td>Thin Telegram Bot API wrapper for sending messages with inline keyboards</td>
+            <td><code>sendTelegramMessage(chatId, text, markup)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/crypto/encryption.ts</code></td>
+            <td>AES-256-GCM encrypt/decrypt for credentials stored in Supabase</td>
+            <td><code>encrypt(plain)</code> · <code>decrypt(enc)</code></td>
+          </tr>
+          <tr>
+            <td><code>lib/supabase/server.ts</code></td>
+            <td>Server-side Supabase client (cookie-based session for App Router)</td>
+            <td><code>createClient()</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- API Routes -->
+  <section>
+    <h2>API Route Reference</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Method + Path</th>
+            <th>Auth</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>GET /api/cron/poll</code></td>
+            <td><span class="badge badge-orange">CRON_SECRET</span></td>
+            <td>Vercel cron trigger — runs full pipeline for all users</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/gmail/fetch-now</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Manual pipeline trigger from the dashboard</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/telegram/webhook</code></td>
+            <td><span class="badge badge-orange">TELEGRAM_WEBHOOK_SECRET</span></td>
+            <td>Receives Telegram callback queries; saves merchant mapping and republishes</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/transactions</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>List transactions with optional <code>?status=</code> filter</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/transactions/:id</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Single transaction detail</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/transactions/:id/republish</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Retry a failed Monarch publish</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/rules</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>List categorization rules</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/rules</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Create a new rule</td>
+          </tr>
+          <tr>
+            <td><code>DELETE /api/rules/:id</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Delete a rule</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/connect/gmail/status</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Check whether Gmail is connected for the current user</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/auth/google</code></td>
+            <td>—</td>
+            <td>Initiates Google OAuth flow; redirects to Google consent screen</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/connect/telegram</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Generates a Telegram link code; user sends it to the bot to connect</td>
+          </tr>
+          <tr>
+            <td><code>POST /api/connect/monarch</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Stores encrypted Monarch credential</td>
+          </tr>
+          <tr>
+            <td><code>GET /api/connect/monarch/categories</code></td>
+            <td><span class="badge badge-muted">session</span></td>
+            <td>Fetches the user's Monarch category list for rule creation</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Database Schema -->
+  <section>
+    <h2>Database Schema</h2>
+    <p>All tables live in the <code>public</code> schema on Supabase Postgres with Row Level Security enabled.
+    Every policy enforces <code>auth.uid() = user_id</code>.</p>
+
+    <div class="schema-grid">
+
+      <div class="card">
+        <div class="schema-table-name">transactions</div>
+        <div class="schema-field"><span class="field-name">id</span><span class="field-type">uuid PK</span></div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid FK</span></div>
+        <div class="schema-field"><span class="field-name">bank_ref_id</span><span class="field-type">text</span><span class="field-note">dedup key</span></div>
+        <div class="schema-field"><span class="field-name">amount</span><span class="field-type">numeric(12,2)</span></div>
+        <div class="schema-field"><span class="field-name">merchant_raw</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">merchant_normalized</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">occurred_at</span><span class="field-type">timestamptz</span></div>
+        <div class="schema-field"><span class="field-name">category</span><span class="field-type">text?</span></div>
+        <div class="schema-field"><span class="field-name">status</span><span class="field-type">text</span><span class="field-note">pending · needs_review · published · failed</span></div>
+        <div class="schema-field"><span class="field-name">published_id</span><span class="field-type">text?</span><span class="field-note">Monarch tx ID</span></div>
+        <div class="schema-field"><span class="field-name">raw_payload</span><span class="field-type">jsonb</span></div>
+      </div>
+
+      <div class="card">
+        <div class="schema-table-name">rules</div>
+        <div class="schema-field"><span class="field-name">id</span><span class="field-type">uuid PK</span></div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid FK</span></div>
+        <div class="schema-field"><span class="field-name">match_type</span><span class="field-type">text</span><span class="field-note">regex · contains · equals</span></div>
+        <div class="schema-field"><span class="field-name">field</span><span class="field-type">text</span><span class="field-note">merchant · sender · body</span></div>
+        <div class="schema-field"><span class="field-name">pattern</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">category</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">priority</span><span class="field-type">int</span><span class="field-note">lower = higher priority</span></div>
+
+        <div class="schema-table-name" style="margin-top:20px">merchant_mappings</div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid FK</span></div>
+        <div class="schema-field"><span class="field-name">merchant_key</span><span class="field-type">text</span><span class="field-note">normalized merchant name</span></div>
+        <div class="schema-field"><span class="field-name">category</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">—</span><span class="field-type">unique(user_id, merchant_key)</span></div>
+      </div>
+
+      <div class="card">
+        <div class="schema-table-name">gmail_connections</div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid PK</span></div>
+        <div class="schema-field"><span class="field-name">email_address</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">refresh_token_enc</span><span class="field-type">jsonb</span><span class="field-note">AES-GCM encrypted</span></div>
+        <div class="schema-field"><span class="field-name">last_history_id</span><span class="field-type">text?</span></div>
+
+        <div class="schema-table-name" style="margin-top:20px">monarch_connections</div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid PK</span></div>
+        <div class="schema-field"><span class="field-name">email</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">credential_enc</span><span class="field-type">jsonb</span><span class="field-note">AES-GCM encrypted</span></div>
+        <div class="schema-field"><span class="field-name">default_account_id</span><span class="field-type">text?</span></div>
+      </div>
+
+      <div class="card">
+        <div class="schema-table-name">telegram_links</div>
+        <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid unique</span></div>
+        <div class="schema-field"><span class="field-name">chat_id</span><span class="field-type">text unique?</span><span class="field-note">null until bot linked</span></div>
+        <div class="schema-field"><span class="field-name">link_code</span><span class="field-type">text unique</span><span class="field-note">user sends to bot</span></div>
+        <div class="schema-field"><span class="field-name">linked_at</span><span class="field-type">timestamptz?</span></div>
+
+        <div class="schema-table-name" style="margin-top:20px">pending_reviews</div>
+        <div class="schema-field"><span class="field-name">transaction_id</span><span class="field-type">uuid FK</span><span class="field-note">unique</span></div>
+        <div class="schema-field"><span class="field-name">telegram_message_id</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">expires_at</span><span class="field-type">timestamptz</span><span class="field-note">7-day TTL</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <span>UPI Ingestor · Architecture</span>
+    <span><a href="setup.html">Setup Guide →</a></span>
+  </footer>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#22201d',
+      primaryTextColor: '#f6f5f3',
+      primaryBorderColor: '#ff692d',
+      lineColor: '#777573',
+      secondaryColor: '#f6f5f3',
+      tertiaryColor: '#fff',
+      background: '#ffffff',
+      mainBkg: '#22201d',
+      nodeBorder: '#ff692d',
+      clusterBkg: '#f6f5f3',
+      titleColor: '#22201d',
+      edgeLabelBackground: '#ffffff',
+      fontFamily: 'DM Sans, sans-serif',
+    }
+  });
+</script>
+</body>
+</html>
