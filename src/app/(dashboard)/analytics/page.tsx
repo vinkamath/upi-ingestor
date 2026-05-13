@@ -12,6 +12,7 @@ import {
   Cell,
   ResponsiveContainer,
 } from 'recharts'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type MonthData = {
@@ -19,6 +20,16 @@ type MonthData = {
   label: string
   categories: Record<string, number>
   total: number
+}
+
+type DrilldownTx = {
+  id: string
+  occurred_at: string
+  email_received_at?: string | null
+  amount: number
+  merchant_raw: string
+  status: string
+  bank_ref_id: string
 }
 
 type TimeRange = '3m' | 'ytd' | '12m' | 'ly'
@@ -49,6 +60,14 @@ function fmtINR(value: number): string {
 
 function fmtINRFull(value: number): string {
   return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+}
+
+function fmtDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+  })
 }
 
 function filterByRange(months: MonthData[], range: TimeRange): MonthData[] {
@@ -82,6 +101,11 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [timeRange, setTimeRange] = useState<TimeRange>('3m')
 
+  // Drilldown state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [drilldownTxs, setDrilldownTxs] = useState<DrilldownTx[]>([])
+  const [drilldownLoading, setDrilldownLoading] = useState(false)
+
   useEffect(() => {
     const id = window.setTimeout(async () => {
       setIsLoading(true)
@@ -94,6 +118,28 @@ export default function AnalyticsPage() {
     }, 0)
     return () => window.clearTimeout(id)
   }, [])
+
+  // Reset drilldown when month changes
+  useEffect(() => {
+    setSelectedCategory(null)
+    setDrilldownTxs([])
+  }, [selectedMonth])
+
+  async function handleCategoryClick(category: string) {
+    if (selectedCategory === category) {
+      setSelectedCategory(null)
+      setDrilldownTxs([])
+      return
+    }
+    setSelectedCategory(category)
+    setDrilldownLoading(true)
+    const res = await fetch(
+      `/api/analytics/transactions?month=${selectedMonth}&category=${encodeURIComponent(category)}`
+    )
+    const json = await res.json()
+    setDrilldownTxs(json.transactions ?? [])
+    setDrilldownLoading(false)
+  }
 
   const allCategories = useMemo(
     () => [...new Set(months.flatMap((m) => Object.keys(m.categories)))].sort(),
@@ -239,11 +285,21 @@ export default function AnalyticsPage() {
                             background: 'var(--card)',
                           }}
                         />
-                        <Bar dataKey="amount" radius={[0, 6, 6, 0]} maxBarSize={28}>
+                        <Bar
+                          dataKey="amount"
+                          radius={[0, 6, 6, 0]}
+                          maxBarSize={28}
+                          style={{ cursor: 'pointer' }}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          onClick={(data: any) => handleCategoryClick(data.name as string)}
+                        >
                           {monthlyChartData.map((entry) => (
                             <Cell
                               key={entry.name}
                               fill={catColor(entry.name, allCategories)}
+                              opacity={
+                                selectedCategory && selectedCategory !== entry.name ? 0.35 : 1
+                              }
                             />
                           ))}
                         </Bar>
@@ -253,30 +309,107 @@ export default function AnalyticsPage() {
 
                   {/* Category breakdown table */}
                   <div className="border-t border-border">
-                    {monthlyChartData.map((entry, i) => (
-                      <div
-                        key={entry.name}
-                        className={cn(
-                          'flex items-center justify-between px-5 py-2.5 text-[13px]',
-                          i > 0 && 'border-t border-border/50'
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ background: catColor(entry.name, allCategories) }}
-                          />
-                          <span className="text-foreground">{entry.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-medium text-foreground">{fmtINRFull(entry.amount)}</span>
-                          <span className="text-muted-foreground ml-2 text-[11px]">
-                            {((entry.amount / currentMonthData.total) * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                    {monthlyChartData.map((entry, i) => {
+                      const isSelected = selectedCategory === entry.name
+                      const isDimmed = selectedCategory !== null && !isSelected
+                      return (
+                        <button
+                          key={entry.name}
+                          className={cn(
+                            'w-full flex items-center justify-between px-5 py-2.5 text-[13px] text-left transition-colors',
+                            i > 0 && 'border-t border-border/50',
+                            isSelected
+                              ? 'bg-muted/60'
+                              : 'hover:bg-muted/30',
+                            isDimmed && 'opacity-40'
+                          )}
+                          onClick={() => handleCategoryClick(entry.name)}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ background: catColor(entry.name, allCategories) }}
+                            />
+                            <span className={cn('text-foreground', isSelected && 'font-medium')}>
+                              {entry.name}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-medium text-foreground">{fmtINRFull(entry.amount)}</span>
+                            <span className="text-muted-foreground ml-2 text-[11px]">
+                              {((entry.amount / currentMonthData.total) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
+
+                  {/* Drilldown panel */}
+                  {selectedCategory && (
+                    <div className="border-t border-border">
+                      {/* Drilldown header */}
+                      <div className="flex items-center justify-between px-5 py-3 bg-muted/40 border-b border-border">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: catColor(selectedCategory, allCategories) }}
+                          />
+                          <span className="text-[13px] font-medium text-foreground">
+                            {selectedCategory}
+                          </span>
+                          {!drilldownLoading && (
+                            <span className="text-[12px] text-muted-foreground">
+                              · {drilldownTxs.length} transaction{drilldownTxs.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(null)
+                            setDrilldownTxs([])
+                          }}
+                          className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                          aria-label="Close drilldown"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Drilldown transactions */}
+                      {drilldownLoading ? (
+                        <div className="px-5 py-6 text-center text-[13px] text-muted-foreground">
+                          Loading…
+                        </div>
+                      ) : drilldownTxs.length === 0 ? (
+                        <div className="px-5 py-6 text-center text-[13px] text-muted-foreground">
+                          No transactions found.
+                        </div>
+                      ) : (
+                        drilldownTxs.map((tx, i) => (
+                          <div
+                            key={tx.id}
+                            className={cn(
+                              'flex items-center justify-between px-5 py-3',
+                              i > 0 && 'border-t border-border/40'
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-[13px] text-foreground font-medium truncate">
+                                {tx.merchant_raw}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {fmtDate(tx.email_received_at ?? tx.occurred_at)}
+                              </p>
+                            </div>
+                            <p className="text-[13px] font-semibold text-foreground shrink-0 ml-4">
+                              {fmtINRFull(tx.amount)}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
