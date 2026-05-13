@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowUpDown, BookOpen, Settings2, LogOut, Zap } from 'lucide-react'
+import { ArrowUpDown, BookOpen, Settings2, LogOut, Zap, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/transactions', label: 'Transactions', icon: ArrowUpDown },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/rules', label: 'Rules', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings2 },
 ]
