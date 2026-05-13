@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UPI Ingestor — Parse every UPI transaction from Gmail, automatically</title>
+<meta name="description" content="Self-hosted UPI transaction parser. Reads Gmail, categorizes via rules, prompts via Telegram, and publishes to Monarch Money — automatically."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Lora:wght@500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --primary:      #ff692d;
+    --primary-dim:  #ff8f5e;
+    --background:   #f6f5f3;
+    --surface:      #ffffff;
+    --foreground:   #22201d;
+    --muted:        #777573;
+    --border:       #e0e0e0;
+    --positive:     #2daf6f;
+    --warning:      #f2c94c;
+    --font-body:    'DM Sans', sans-serif;
+    --font-display: 'Lora', serif;
+    --font-mono:    'DM Mono', monospace;
+    --radius:       12px;
+    --shadow:       0 1px 4px rgba(34,32,29,0.08), 0 1px 2px rgba(34,32,29,0.04);
+    --shadow-md:    0 4px 16px rgba(34,32,29,0.10), 0 1px 4px rgba(34,32,29,0.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(246, 245, 243, 0.88);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .nav-logo span { color: var(--primary); }
+  .nav-links { display: flex; gap: 28px; align-items: center; }
+  .nav-links a {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--muted);
+    transition: color 0.15s;
+  }
+  .nav-links a:hover { color: var(--foreground); }
+  .nav-links .nav-cta {
+    background: var(--foreground);
+    color: var(--background);
+    padding: 7px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .nav-links .nav-cta:hover { background: var(--primary); color: #fff; }
+
+  /* ── Hero ── */
+  .hero {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 88px 24px 72px;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--primary);
+    background: #fff1eb;
+    border: 1px solid #ffd5c2;
+    border-radius: 100px;
+    padding: 4px 14px;
+    margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--foreground);
+    margin-bottom: 20px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--primary);
+  }
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 540px;
+    margin: 0 auto 36px;
+    line-height: 1.7;
+  }
+  .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 22px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.15s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary {
+    background: var(--foreground);
+    color: var(--background);
+  }
+  .btn-primary:hover { background: var(--primary); }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* ── Pills ── */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 40px auto 0;
+    max-width: 600px;
+  }
+  .pill {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: var(--shadow);
+  }
+  .pill-row { width: 100%; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Divider ── */
+  .stripe {
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--warning) 50%, var(--positive) 100%);
+    margin: 0;
+  }
+
+  /* ── Section ── */
+  .section { padding: 72px 24px; }
+  .section-inner { max-width: 960px; margin: 0 auto; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 10px;
+  }
+  .section h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  .section-lead {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 540px;
+    line-height: 1.7;
+    margin-bottom: 48px;
+  }
+
+  /* ── Three-column feature cards ── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 680px) { .feature-grid { grid-template-columns: 1fr; } }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .feature-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .icon-orange { background: #fff1eb; }
+  .icon-green  { background: #e8f7ef; }
+  .icon-yellow { background: #fdf8e3; }
+  .feature-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--foreground);
+  }
+  .feature-card p {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+  .feature-card p a { color: var(--primary); border-bottom: 1px solid #ffd5c2; transition: border-color 0.15s; }
+  .feature-card p a:hover { border-color: var(--primary); }
+
+  /* ── Arch diagram ── */
+  .arch-section { background: var(--foreground); color: var(--background); }
+  .arch-section .section-label { color: var(--primary-dim); }
+  .arch-section h2 { color: var(--background); }
+  .arch-section .section-lead { color: #9a9794; }
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .flow-node {
+    background: #2e2b27;
+    border: 1px solid #3d3a35;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #e0ddd8;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .flow-node:hover { background: #3a3632; }
+  .flow-node.accent { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .flow-node.green  { background: var(--positive); color: #fff; border-color: var(--positive); }
+  .flow-node.yellow { background: #3d3320; color: var(--warning); border-color: #5a4a1a; }
+  .flow-arrow {
+    color: #4a4742;
+    font-size: 18px;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+  .flow-rows { display: flex; flex-direction: column; gap: 16px; }
+  .flow-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .flow-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: #5a5650;
+    padding: 0 4px;
+  }
+  .arch-links { margin-top: 32px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .arch-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--primary-dim);
+    border: 1px solid #3d3a35;
+    border-radius: 100px;
+    padding: 8px 18px;
+    transition: all 0.15s;
+  }
+  .arch-link:hover { border-color: var(--primary); color: var(--primary); background: #2e2b27; }
+
+  /* ── Monarch CTA ── */
+  .monarch-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .monarch-inner {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px;
+    text-align: center;
+  }
+  .monarch-inner .section-label { display: block; margin-bottom: 10px; }
+  .monarch-inner h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .monarch-inner p {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 480px;
+    margin: 0 auto 32px;
+    line-height: 1.7;
+  }
+  .monarch-inner .note {
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .monarch-inner .note a { color: var(--primary); border-bottom: 1px solid #ffd5c2; }
+  .monarch-inner .note a:hover { border-color: var(--primary); }
+
+  /* ── Setup steps ── */
+  .setup-section { background: var(--background); }
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  @media (max-width: 640px) { .setup-grid { grid-template-columns: 1fr; } }
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 16px;
+  }
+  .setup-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .setup-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .setup-card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .setup-card code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--primary);
+  }
+  .setup-cta { margin-top: 28px; text-align: center; }
+  .setup-cta p { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  footer a { color: var(--primary); }
+  footer a:hover { text-decoration: underline; }
+  .footer-links { display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="nav-logo">UPI <span>Ingestor</span></div>
+  <div class="nav-links">
+    <a href="architecture.html">Architecture</a>
+    <a href="setup.html">Setup</a>
+    <a href="https://github.com/vinkamath/upi-ingestor" class="nav-cta">GitHub →</a>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-eyebrow">Open source · Self-hosted</div>
+  <h1>Parse every UPI transaction<br/>from Gmail, <em>automatically</em></h1>
+  <p>
+    Your bank already sends you a notification for every payment.
+    UPI Ingestor reads those emails, extracts the structured data,
+    and keeps a clean searchable record — with automatic categorization
+    and optional publishing to Monarch Money.
+  </p>
+  <div class="hero-actions">
+    <a href="setup.html" class="btn btn-primary">Get started →</a>
+    <a href="architecture.html" class="btn btn-secondary">How it works</a>
+  </div>
+
+  <div class="pills">
+    <div class="pill-row">
+      <span class="pill">Next.js 16</span>
+      <span class="pill">React 19</span>
+      <span class="pill">TypeScript</span>
+      <span class="pill">Tailwind v4</span>
+    </div>
+    <div class="pill-row">
+      <span class="pill">Supabase</span>
+      <span class="pill">Gmail API</span>
+      <span class="pill">Telegram Bot</span>
+      <span class="pill">Vercel</span>
+    </div>
+  </div>
+</section>
+
+<div class="stripe"></div>
+
+<!-- ── Features ── -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">What you get</div>
+    <h2>Three layers, each independently useful</h2>
+    <p class="section-lead">Use just the parser, add Telegram categorization, or wire up Monarch for full expense tracking — each layer works on its own.</p>
+
+    <div class="feature-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon icon-orange">📥</div>
+        <h3>Parse + track</h3>
+        <p>
+          Point it at a Gmail label and every UPI debit is automatically extracted,
+          deduplicated, and stored with amount, merchant, timestamp, and bank reference.
+          No manual entry. No spreadsheet. HDFC supported today — parser registry is open for contributions.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-yellow">🏷</div>
+        <h3>Categorize + learn</h3>
+        <p>
+          Define rules (regex / contains / equals on merchant name) or just let the app ask.
+          A Telegram inline keyboard prompts you for unknown merchants, and every answer is
+          saved as a permanent mapping — each merchant is only categorized once, ever.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon icon-green">🏦</div>
+        <h3>Publish to Monarch</h3>
+        <p>
+          Connect <a href="https://monarch.com/referral/2zjygvbrc9">Monarch Money</a> and
+          categorized transactions are automatically pushed via their GraphQL API —
+          no CSV exports, no import steps. Transactions appear in Monarch as soon as they
+          land in your inbox.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Architecture ── -->
+<section class="section arch-section">
+  <div class="section-inner">
+    <div class="section-label">Architecture</div>
+    <h2>One pipeline, triggered daily</h2>
+    <p class="section-lead">A single Vercel function invocation moves data from Gmail to Monarch. No queues, no workers — just a cron job you can also trigger manually.</p>
+
+    <div class="flow-rows">
+      <div class="flow-row">
+        <div class="flow-node accent">Vercel Cron</div>
+        <div class="flow-arrow">+</div>
+        <div class="flow-node accent">Web UI</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Pipeline</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Gmail</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Parser</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Categorizer</div>
+      </div>
+      <div class="flow-row">
+        <span class="flow-label" style="padding-left:0">category hit</span>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node green">Monarch</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node yellow">Supabase</div>
+      </div>
+      <div class="flow-row">
+        <span class="flow-label" style="padding-left:0">category miss</span>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">Telegram Bot</div>
+        <div class="flow-arrow">→</div>
+        <span class="flow-label">user picks → saves mapping → republish</span>
+      </div>
+    </div>
+
+    <div class="arch-links">
+      <a href="architecture.html" class="arch-link">Full architecture walkthrough →</a>
+      <a href="setup.html" class="arch-link">Setup guide →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Monarch CTA ── -->
+<section class="monarch-section">
+  <div class="monarch-inner">
+    <span class="section-label">Built-in integration</span>
+    <h2>Works great with Monarch Money</h2>
+    <p>
+      Monarch is a personal finance app for tracking net worth, budgets, and
+      transactions across all your accounts. UPI Ingestor feeds your Indian bank
+      transactions into it automatically — closing the gap for accounts Monarch
+      doesn't natively support.
+    </p>
+    <a href="https://monarch.com/referral/2zjygvbrc9" class="btn btn-primary" style="font-size:15px; padding: 13px 28px;">
+      Try Monarch free →
+    </a>
+    <p class="note">
+      Don't use Monarch? The app still works as a standalone parser and dashboard.<br/>
+      See the <a href="setup.html">setup guide</a> to skip the Monarch connection step.
+    </p>
+  </div>
+</section>
+
+<!-- ── Setup steps ── -->
+<section class="section setup-section">
+  <div class="section-inner">
+    <div class="section-label">Get started</div>
+    <h2>Up and running in four steps</h2>
+    <p class="section-lead">Self-host on Vercel. Data stays in your Supabase project. You control everything.</p>
+
+    <div class="setup-grid">
+      <div class="setup-card">
+        <div class="setup-num">1</div>
+        <div>
+          <h3>Install &amp; configure</h3>
+          <p>Clone the repo, run <code>npm install</code>, and copy <code>.env.example</code> to <code>.env.local</code>. Fill in your Supabase URL, anon key, and encryption key.</p>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="setup-num">2</div>
+        <div>
+          <h3>Connect Gmail</h3>
+          <p>Create a Google Cloud project, enable the Gmail API, and authorize via OAuth in the app dashboard. Set a Gmail filter to label UPI emails.</p>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="setup-num">3</div>
+        <div>
+          <h3>Link Telegram (optional)</h3>
+          <p>Create a bot via <code>@BotFather</code>, add the token to your env, and send your link code to the bot from the dashboard. Inline keyboard prompts activate for unknown merchants.</p>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="setup-num">4</div>
+        <div>
+          <h3>Deploy to Vercel</h3>
+          <p>Push to GitHub and import in Vercel. Set your environment variables. The daily cron is pre-configured in <code>vercel.json</code> — no extra setup needed.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-cta">
+      <p>Need the full service-by-service walkthrough?</p>
+      <a href="setup.html" class="btn btn-primary">Open setup guide →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <span>UPI Ingestor — open source, self-hosted</span>
+  <div class="footer-links">
+    <a href="architecture.html">Architecture</a>
+    <a href="setup.html">Setup</a>
+    <a href="https://monarch.com/referral/2zjygvbrc9">Try Monarch →</a>
+    <a href="https://github.com/vinkamath/upi-ingestor">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>
