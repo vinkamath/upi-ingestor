@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Setup Guide — UPI Ingestor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Lora:wght@500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --primary:      #ff692d;
+    --background:   #f6f5f3;
+    --surface:      #ffffff;
+    --foreground:   #22201d;
+    --muted:        #777573;
+    --border:       #e0e0e0;
+    --positive:     #2daf6f;
+    --destructive:  #e66774;
+    --warning:      #f2c94c;
+    --font-body:    'DM Sans', sans-serif;
+    --font-display: 'Lora', serif;
+    --font-mono:    'DM Mono', monospace;
+    --radius:       10px;
+    --shadow:       0 1px 3px rgba(34,32,29,0.08), 0 1px 2px rgba(34,32,29,0.04);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--background); color: var(--foreground); font-size: 15px; line-height: 1.65; }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* ── Header ── */
+  .site-header { border-bottom: 2px solid var(--primary); padding-bottom: 24px; margin-bottom: 48px; }
+  .site-header .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--primary); margin-bottom: 6px; }
+  .site-header h1 { font-family: var(--font-display); font-size: 2.2rem; font-weight: 600; line-height: 1.2; }
+  .site-header .subtitle { color: var(--muted); margin-top: 6px; font-size: 14px; }
+  .site-header nav { margin-top: 16px; }
+  .site-header nav a {
+    display: inline-block;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    margin-right: 20px;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .site-header nav a:hover { border-color: var(--primary); }
+
+  /* ── Sections ── */
+  section { margin-bottom: 56px; }
+  h2 { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; border-left: 3px solid var(--primary); padding-left: 14px; margin-bottom: 20px; }
+  h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 24px 0 10px; }
+  p { margin-bottom: 14px; }
+
+  /* ── Service cards ── */
+  .service { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
+  .service-header { display: flex; align-items: center; gap: 14px; padding: 18px 22px; background: var(--foreground); color: var(--background); }
+  .service-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .service-title { font-weight: 600; font-size: 15px; }
+  .service-subtitle { font-size: 12px; color: #aaa; margin-top: 1px; }
+  .service-body { padding: 22px; }
+
+  /* ── Numbered steps ── */
+  .step-list { list-style: none; counter-reset: steps; }
+  .step-list li {
+    counter-increment: steps;
+    position: relative;
+    padding-left: 38px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .step-list li::before {
+    content: counter(steps);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Code ── */
+  pre {
+    background: #1a1816;
+    color: #f6f5f3;
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+  }
+  code { font-family: var(--font-mono); font-size: 12.5px; background: var(--background); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  thead { background: var(--foreground); color: var(--background); }
+  thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 14px; text-align: left; }
+  tbody tr { border-top: 1px solid var(--border); }
+  tbody tr:hover { background: var(--background); }
+  td { padding: 10px 14px; vertical-align: top; line-height: 1.5; }
+  td code { font-size: 12px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  .badge-req { background: #fff1eb; color: var(--primary); border: 1px solid #ffd5c2; }
+  .badge-opt { background: var(--background); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Callout ── */
+  .callout { border-left: 3px solid var(--primary); background: #fff7f4; border-radius: 0 var(--radius) var(--radius) 0; padding: 13px 18px; font-size: 14px; margin: 16px 0; }
+  .callout-warn { border-color: var(--warning); background: #fffdf0; }
+  .callout-ok   { border-color: var(--positive); background: #f2fbf6; }
+  .callout strong { font-weight: 600; }
+  .callout a { color: var(--positive); }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; margin: 0 0 16px; }
+  .checklist li { padding: 6px 0 6px 32px; position: relative; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before { content: '○'; position: absolute; left: 6px; color: var(--border); font-size: 16px; line-height: 1.4; }
+
+  /* ── Footer ── */
+  footer { border-top: 1px solid var(--border); padding-top: 24px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="site-header">
+    <div class="eyebrow">UPI Ingestor · Documentation</div>
+    <h1>Setup Guide</h1>
+    <p class="subtitle">Everything you need to go from zero to a working pipeline in production.</p>
+    <nav>
+      <a href="index.html">← Home</a>
+      <a href="architecture.html">Architecture</a>
+    </nav>
+  </header>
+
+  <section>
+    <h2>Prerequisites</h2>
+    <p>Before you start, have accounts and access to the following services:</p>
+    <ul class="checklist">
+      <li>A <strong>Supabase</strong> project — free tier is fine</li>
+      <li>A <strong>Google Cloud project</strong> with the Gmail API enabled and an OAuth 2.0 client configured</li>
+      <li>A <strong>Telegram bot</strong> created via <a href="https://t.me/BotFather" style="color: var(--primary);">@BotFather</a> (takes ~2 minutes)</li>
+      <li>A <strong>Monarch Money</strong> account — <a href="https://monarch.com/referral/2zjygvbrc9" style="color: var(--primary);">try it free →</a></li>
+      <li>A <strong>Vercel</strong> account for deployment (free Hobby plan works; cron runs once per day)</li>
+      <li>Node.js 20+ and npm installed locally</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Quick Start</h2>
+    <pre># Clone and install
+git clone &lt;repo-url&gt; &amp;&amp; cd upi-ingestor
+npm install
+
+# Create your local env file
+cp .env.example .env.local
+
+# Start the dev server
+npm run dev
+# → http://localhost:3000</pre>
+    <p>Fill in <code>.env.local</code> following the sections below, then apply the Supabase migrations before testing the pipeline.</p>
+  </section>
+
+  <section>
+    <h2>Environment Variables</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Your Supabase project URL, e.g. <code>https://xxxx.supabase.co</code></td></tr>
+          <tr><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Supabase anon/public key. Safe to expose to the browser (RLS enforced).</td></tr>
+          <tr><td><code>ENCRYPTION_KEY</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>32-byte hex string for AES-256-GCM credential encryption. Generate with <code>openssl rand -hex 32</code>. Never expose this.</td></tr>
+          <tr><td><code>CRON_SECRET</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Bearer token Vercel sends when calling <code>/api/cron/poll</code>. Set the same value in Vercel → Project → Cron secrets.</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_ID</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>OAuth 2.0 client ID from Google Cloud Console.</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>OAuth 2.0 client secret. Keep server-side only.</td></tr>
+          <tr><td><code>GOOGLE_REDIRECT_URI</code></td><td><span class="badge badge-req">required</span></td><td><code>http://localhost:3000/auth/callback</code></td><td>Must match exactly what you registered in Google Cloud Console. Change to your Vercel URL for production.</td></tr>
+          <tr><td><code>GMAIL_FETCH_LABEL</code></td><td><span class="badge badge-opt">optional</span></td><td><code>UPI</code></td><td>Gmail label to filter for transaction emails. Create this label and set a filter rule to apply it to UPI notifications from your bank.</td></tr>
+          <tr><td><code>GMAIL_FETCH_DAYS_BACK</code></td><td><span class="badge badge-opt">optional</span></td><td><code>3</code></td><td>How many days back to look for emails in each poll run.</td></tr>
+          <tr><td><code>GMAIL_FETCH_MAX_RESULTS</code></td><td><span class="badge badge-opt">optional</span></td><td><code>25</code></td><td>Maximum number of Gmail messages to process per run.</td></tr>
+          <tr><td><code>TELEGRAM_BOT_TOKEN</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Token from @BotFather, format: <code>123456:ABC-DEF...</code></td></tr>
+          <tr><td><code>TELEGRAM_WEBHOOK_SECRET</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Arbitrary secret you set when registering the webhook. Telegram sends it back so the endpoint can verify authenticity.</td></tr>
+          <tr><td><code>MONARCH_GRAPHQL_URL</code></td><td><span class="badge badge-opt">optional</span></td><td><code>https://api.monarch.com/graphql</code></td><td>Pre-filled in <code>.env.example</code>. Only change this if Monarch updates their API endpoint.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>1 — Supabase</h2>
+    <div class="service">
+      <div class="service-header">
+        <div class="service-icon" style="background: #1c1c1c;">🗄</div>
+        <div><div class="service-title">Supabase</div><div class="service-subtitle">Auth, Postgres, Row Level Security</div></div>
+      </div>
+      <div class="service-body">
+        <ol class="step-list">
+          <li>Create a new project at <strong>supabase.com</strong>. Pick a region close to your Vercel deployment region.</li>
+          <li>Go to <strong>Project Settings → API</strong>. Copy your <strong>Project URL</strong> and <strong>anon public key</strong> into <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.</li>
+          <li>Apply the database migrations. Open the <strong>SQL Editor</strong> in the Supabase dashboard and run each file in <code>supabase/migrations/</code> in order:
+            <pre>202605051230_init.sql
+202605051640_pending_reviews_unique.sql
+202605061832_monarch_fx_cache.sql
+202605061845_transactions_email_received_at.sql
+202605071220_merchant_mappings_last_seen_and_prune.sql</pre>
+            Alternatively, if you have the Supabase CLI linked: <code>supabase db push</code>
+          </li>
+          <li>Verify RLS is enabled: in the dashboard go to <strong>Table Editor</strong>, click any table, and confirm the lock icon is shown.</li>
+        </ol>
+        <div class="callout callout-ok">
+          <strong>No service role key needed</strong> — the app uses the anon key with Supabase SSR sessions. The service role key bypasses RLS; do not add it to your env.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 — Google OAuth &amp; Gmail API</h2>
+    <div class="service">
+      <div class="service-header">
+        <div class="service-icon" style="background: #4285F4; color: #fff; font-weight: 700; font-size: 16px;">G</div>
+        <div><div class="service-title">Google Cloud Console</div><div class="service-subtitle">OAuth 2.0 client with Gmail read scope</div></div>
+      </div>
+      <div class="service-body">
+        <ol class="step-list">
+          <li>Go to <strong>console.cloud.google.com</strong> → create or reuse a project.</li>
+          <li>Enable the <strong>Gmail API</strong>: APIs &amp; Services → Library → search "Gmail API" → Enable.</li>
+          <li>Go to <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose <em>External</em>. Add scope <code>https://www.googleapis.com/auth/gmail.readonly</code>. Add your own Gmail address as a test user.</li>
+          <li>Go to <strong>Credentials → Create Credentials → OAuth client ID</strong>. Application type: <em>Web application</em>. Add redirect URIs:
+            <pre>http://localhost:3000/api/auth/google        # local dev
+https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
+          </li>
+          <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into your env file.</li>
+          <li>In Gmail, create a label called <strong>UPI</strong> (or whatever you set <code>GMAIL_FETCH_LABEL</code> to), then set a filter to auto-apply it to your bank's notification emails.</li>
+        </ol>
+        <div class="callout callout-warn">
+          <strong>Heads up:</strong> while your OAuth app is in <em>Testing</em> mode, refresh tokens expire after 7 days. Publish the app to get non-expiring tokens.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3 — Telegram Bot</h2>
+    <div class="service">
+      <div class="service-header">
+        <div class="service-icon" style="background: #2ca5e0;">✈</div>
+        <div><div class="service-title">Telegram BotFather</div><div class="service-subtitle">Inline keyboard prompts for unknown merchants</div></div>
+      </div>
+      <div class="service-body">
+        <ol class="step-list">
+          <li>Open Telegram and start a chat with <strong>@BotFather</strong>. Send <code>/newbot</code> and follow the prompts to get your bot token.</li>
+          <li>Add <code>TELEGRAM_BOT_TOKEN</code> to your env. Choose a random string for <code>TELEGRAM_WEBHOOK_SECRET</code> (e.g. <code>openssl rand -hex 20</code>).</li>
+          <li>Register the webhook with Telegram once after deploying:
+            <pre>curl -X POST "https://api.telegram.org/bot&lt;TOKEN&gt;/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://&lt;your-vercel-domain&gt;/api/telegram/webhook",
+    "secret_token": "&lt;TELEGRAM_WEBHOOK_SECRET&gt;"
+  }'</pre>
+          </li>
+          <li>In the app dashboard, go to <strong>Settings → Telegram</strong>. Copy the link code and send it to your bot to connect your account.</li>
+        </ol>
+        <div class="callout">
+          <strong>Local testing:</strong> Telegram cannot reach <code>localhost</code>. Deploy to a Vercel preview URL first, then register the webhook against that URL.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>4 — Monarch Money</h2>
+    <div class="service">
+      <div class="service-header">
+        <div class="service-icon" style="background: #ff692d;">M</div>
+        <div><div class="service-title">Monarch Money</div><div class="service-subtitle">GraphQL publisher for transactions</div></div>
+      </div>
+      <div class="service-body">
+        <div class="callout callout-ok">
+          <strong>Don't have Monarch yet?</strong> <a href="https://monarch.com/referral/2zjygvbrc9">Try it free →</a> — budgets, net worth, investments, and your UPI transactions all in one place.
+        </div>
+        <ol class="step-list">
+          <li><code>MONARCH_GRAPHQL_URL</code> is pre-configured to <code>https://api.monarch.com/graphql</code> — no change needed.</li>
+          <li>In the app dashboard, go to <strong>Settings → Monarch</strong> and enter your Monarch account email and password. The app encrypts the credential with your <code>ENCRYPTION_KEY</code> and stores the ciphertext in Supabase — your plaintext password is never persisted.</li>
+          <li>After connecting, use the <strong>Fetch Categories</strong> button to load your Monarch categories — this populates the suggestions shown in Telegram prompts.</li>
+          <li>Optionally set a default Monarch account ID so transactions are automatically attributed to the right account.</li>
+        </ol>
+        <div class="callout callout-warn">
+          <strong>Note:</strong> Monarch's GraphQL API is not officially documented. The publisher uses a minimal surface (<code>createTransaction</code> mutation). If Monarch updates their schema, check <code>src/lib/publishers/monarch/publisher.ts</code>.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 — Deploy to Vercel</h2>
+    <div class="service">
+      <div class="service-header">
+        <div class="service-icon" style="background: #000;">▲</div>
+        <div><div class="service-title">Vercel</div><div class="service-subtitle">Hosting, cron jobs, serverless functions</div></div>
+      </div>
+      <div class="service-body">
+        <ol class="step-list">
+          <li>Import the repo via the Vercel dashboard, or use the CLI:
+            <pre>npx vercel          # preview deploy
+npx vercel --prod   # production</pre>
+          </li>
+          <li>In <strong>Project → Settings → Environment Variables</strong>, add all variables from <code>.env.local</code> to the Production environment. Make sure to update <code>GOOGLE_REDIRECT_URI</code> to your production domain.</li>
+          <li>The cron job is pre-configured in <code>vercel.json</code>:
+            <pre>{ "crons": [{ "path": "/api/cron/poll", "schedule": "30 3 * * *" }] }</pre>
+            On Vercel Hobby, crons run at most once per day — this schedule is within that limit.
+          </li>
+          <li>After deploying, re-register the Telegram webhook against your production URL (see step 3 above).</li>
+        </ol>
+        <div class="callout callout-ok">
+          <strong>GitHub Pages:</strong> go to <strong>Settings → Pages → Source → Deploy from branch</strong>, select <code>main</code> and the <code>/docs</code> folder to serve this site.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Verification Checklist</h2>
+    <ul class="checklist">
+      <li>Sign in at <code>/login</code> — you should land on the Transactions dashboard</li>
+      <li>Connect Gmail: <strong>Settings → Gmail</strong> → authorize via Google OAuth → status shows "Connected"</li>
+      <li>Connect Telegram: generate a link code → send it to your bot → "Linked" status appears</li>
+      <li>Connect Monarch: enter credentials → fetch categories → category list populates</li>
+      <li>Click <strong>Fetch Now</strong> — pipeline runs, summary shows fetched/parsed/inserted counts</li>
+      <li>If any transaction shows <code>needs_review</code>, check Telegram — inline keyboard should have arrived</li>
+      <li>Tap a category in Telegram — transaction status should update to <code>published</code></li>
+      <li>Verify the transaction appears in Monarch Money</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>UPI Ingestor · Setup Guide</span>
+    <span><a href="architecture.html">Architecture →</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
