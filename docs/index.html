@@ -407,7 +407,7 @@
         <div class="setup-num">1</div>
         <div>
           <h3>Install &amp; configure</h3>
-          <p>Clone the repo, run <code>npm install</code>, and copy <code>.env.example</code> to <code>.env.local</code>. Fill in your Supabase URL, anon key, and encryption key.</p>
+          <p>Clone the repo, run <code>npm install</code>, and copy <code>.env.example</code> to <code>.env.local</code>. Fill in your Supabase URL, anon key, secret key, and encryption key.</p>
         </div>
       </div>
       <div class="setup-card">
@@ -428,7 +428,7 @@
         <div class="setup-num">4</div>
         <div>
           <h3>Deploy to Vercel</h3>
-          <p>Push to GitHub and import in Vercel. Set your environment variables. The daily cron is pre-configured in <code>vercel.json</code> — no extra setup needed.</p>
+          <p>Push to GitHub and import in Vercel. Set your environment variables (including <code>SUPABASE_SECRET_KEY</code> for cron). The daily cron is pre-configured in <code>vercel.json</code>.</p>
         </div>
       </div>
     </div>

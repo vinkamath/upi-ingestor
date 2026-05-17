@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { categorizeTransaction } from '@/lib/categorizer/engine'
 import { fetchGmailTransactions } from '@/lib/email-sources/gmail'
 import { sendTelegramMessage } from '@/lib/telegram/client'
 import { publishers } from '@/lib/publishers'
 
 export async function processUserTransactions(userId: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const fetched = await fetchGmailTransactions(userId)
   const txs = fetched.transactions
   const summary = {

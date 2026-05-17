@@ -177,7 +177,7 @@
     <h2>Overview</h2>
     <p>UPI Ingestor is a personal finance automation pipeline built as a single Next.js application deployed on Vercel. It has no background workers or queues — the entire flow runs synchronously inside a single function invocation, triggered either by a daily cron job or a manual fetch from the dashboard.</p>
     <div class="callout">
-      <strong>Security:</strong> Every credential (Gmail OAuth tokens, Monarch password) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>.
+      <strong>Security:</strong> Every credential (Gmail OAuth tokens, Monarch password) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>. Browser-facing routes use the publishable/anon key with SSR sessions; the cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> (server-only, never exposed to the client).
     </div>
   </section>
 
@@ -263,7 +263,7 @@
         <div class="step-num">1</div>
         <div class="step-body">
           <strong>Trigger</strong>
-          <p>Vercel cron fires <code>GET /api/cron/poll</code> at 3:30 UTC daily (<code>vercel.json</code>). The UI can also trigger <code>POST /api/gmail/fetch-now</code> manually. Both call <code>processUserTransactions(userId)</code> in <code>src/lib/pipeline.ts</code>.</p>
+          <p>Vercel cron fires <code>GET /api/cron/poll</code> at 3:30 UTC daily (<code>vercel.json</code>), authenticated with <code>CRON_SECRET</code>. The handler lists all rows in <code>gmail_connections</code> using the secret-key admin client, then runs the pipeline per user. The UI can also trigger <code>POST /api/gmail/fetch-now</code> manually (session auth). Both call <code>processUserTransactions(userId)</code> in <code>src/lib/pipeline.ts</code>.</p>
         </div>
       </div>
       <div class="step">
@@ -329,6 +329,7 @@
           <tr><td><code>lib/publishers/monarch/</code></td><td>Monarch GraphQL publisher; handles credential decryption and mutation</td><td><code>publisher.publish(userId, tx)</code></td></tr>
           <tr><td><code>lib/telegram/client.ts</code></td><td>Telegram Bot API wrapper for sending inline keyboard messages</td><td><code>sendTelegramMessage(chatId, text, markup)</code></td></tr>
           <tr><td><code>lib/crypto/encryption.ts</code></td><td>AES-256-GCM encrypt/decrypt for credentials stored in Supabase</td><td><code>encrypt(plain)</code> · <code>decrypt(enc)</code></td></tr>
+          <tr><td><code>lib/supabase/admin.ts</code></td><td>Secret-key Supabase client for cron and pipeline (bypasses RLS server-side)</td><td><code>createAdminClient()</code></td></tr>
         </tbody>
       </table>
     </div>
@@ -340,7 +341,7 @@
       <table>
         <thead><tr><th>Method + Path</th><th>Auth</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td><code>GET /api/cron/poll</code></td><td><span class="badge badge-orange">CRON_SECRET</span></td><td>Vercel cron trigger — runs full pipeline for all users</td></tr>
+          <tr><td><code>GET /api/cron/poll</code></td><td><span class="badge badge-orange">CRON_SECRET</span> + secret key</td><td>Vercel cron trigger — lists all <code>gmail_connections</code>, runs full pipeline per user</td></tr>
           <tr><td><code>POST /api/gmail/fetch-now</code></td><td><span class="badge badge-muted">session</span></td><td>Manual pipeline trigger from the dashboard</td></tr>
           <tr><td><code>POST /api/telegram/webhook</code></td><td><span class="badge badge-orange">webhook secret</span></td><td>Receives Telegram callback queries; saves merchant mapping and republishes</td></tr>
           <tr><td><code>GET /api/transactions</code></td><td><span class="badge badge-muted">session</span></td><td>List transactions with optional <code>?status=</code> filter</td></tr>

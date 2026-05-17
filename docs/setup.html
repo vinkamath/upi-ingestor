@@ -186,6 +186,7 @@ npm run dev
         <tbody>
           <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Your Supabase project URL, e.g. <code>https://xxxx.supabase.co</code></td></tr>
           <tr><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Supabase anon/public key. Safe to expose to the browser (RLS enforced).</td></tr>
+          <tr><td><code>SUPABASE_SECRET_KEY</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Supabase <strong>secret</strong> API key (<code>sb_secret_...</code>) or legacy <code>service_role</code> JWT (server-only). Used by the cron job and pipeline to read/write user data without a browser session. Create under <strong>Settings → API Keys</strong>. <strong>Never</strong> prefix with <code>NEXT_PUBLIC_</code> or commit this value.</td></tr>
           <tr><td><code>ENCRYPTION_KEY</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>32-byte hex string for AES-256-GCM credential encryption. Generate with <code>openssl rand -hex 32</code>. Never expose this.</td></tr>
           <tr><td><code>CRON_SECRET</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>Bearer token Vercel sends when calling <code>/api/cron/poll</code>. Set the same value in Vercel → Project → Cron secrets.</td></tr>
           <tr><td><code>GOOGLE_CLIENT_ID</code></td><td><span class="badge badge-req">required</span></td><td>—</td><td>OAuth 2.0 client ID from Google Cloud Console.</td></tr>
@@ -212,7 +213,7 @@ npm run dev
       <div class="service-body">
         <ol class="step-list">
           <li>Create a new project at <strong>supabase.com</strong>. Pick a region close to your Vercel deployment region.</li>
-          <li>Go to <strong>Project Settings → API</strong>. Copy your <strong>Project URL</strong> and <strong>anon public key</strong> into <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.</li>
+          <li>Go to <strong>Settings → API Keys</strong>. Copy your <strong>Project URL</strong> (also under API settings), <strong>publishable</strong> (or legacy anon) key, and a <strong>secret</strong> key into <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, and <code>SUPABASE_SECRET_KEY</code>.</li>
           <li>Apply the database migrations. Open the <strong>SQL Editor</strong> in the Supabase dashboard and run each file in <code>supabase/migrations/</code> in order:
             <pre>202605051230_init.sql
 202605051640_pending_reviews_unique.sql
@@ -223,8 +224,8 @@ npm run dev
           </li>
           <li>Verify RLS is enabled: in the dashboard go to <strong>Table Editor</strong>, click any table, and confirm the lock icon is shown.</li>
         </ol>
-        <div class="callout callout-ok">
-          <strong>No service role key needed</strong> — the app uses the anon key with Supabase SSR sessions. The service role key bypasses RLS; do not add it to your env.
+        <div class="callout callout-warn">
+          <strong>Secret key:</strong> Dashboard routes use the publishable/anon key with Supabase SSR sessions (RLS enforced). The cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> so they can process all connected users without a login cookie. Keep this key server-side only.
         </div>
       </div>
     </div>
@@ -321,7 +322,7 @@ https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
             <pre>npx vercel          # preview deploy
 npx vercel --prod   # production</pre>
           </li>
-          <li>In <strong>Project → Settings → Environment Variables</strong>, add all variables from <code>.env.local</code> to the Production environment. Make sure to update <code>GOOGLE_REDIRECT_URI</code> to your production domain.</li>
+          <li>In <strong>Project → Settings → Environment Variables</strong>, add all variables from <code>.env.local</code> to the Production environment — including <code>SUPABASE_SECRET_KEY</code> (required for the daily cron). Make sure to update <code>GOOGLE_REDIRECT_URI</code> to your production domain.</li>
           <li>The cron job is pre-configured in <code>vercel.json</code>:
             <pre>{ "crons": [{ "path": "/api/cron/poll", "schedule": "30 3 * * *" }] }</pre>
             On Vercel Hobby, crons run at most once per day — this schedule is within that limit.
@@ -342,7 +343,8 @@ npx vercel --prod   # production</pre>
       <li>Connect Gmail: <strong>Settings → Gmail</strong> → authorize via Google OAuth → status shows "Connected"</li>
       <li>Connect Telegram: generate a link code → send it to your bot → "Linked" status appears</li>
       <li>Connect Monarch: enter credentials → fetch categories → category list populates</li>
-      <li>Click <strong>Fetch Now</strong> — pipeline runs, summary shows fetched/parsed/inserted counts</li>
+          <li>Click <strong>Fetch Now</strong> — pipeline runs, summary shows fetched/parsed/inserted counts</li>
+          <li>Test cron locally (optional): with <code>npm run dev</code> running, call <code>GET /api/cron/poll</code> with <code>Authorization: Bearer $CRON_SECRET</code>. Expect <code>totalUsers</code> ≥ 1 after Gmail is connected.</li>
       <li>If any transaction shows <code>needs_review</code>, check Telegram — inline keyboard should have arrived</li>
       <li>Tap a category in Telegram — transaction status should update to <code>published</code></li>
       <li>Verify the transaction appears in Monarch Money</li>

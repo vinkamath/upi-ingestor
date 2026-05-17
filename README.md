@@ -119,8 +119,8 @@ git clone <repo-url> && cd upi-ingestor && npm install
 
 # 2. environment
 cp .env.example .env.local
-# fill in: Supabase URL + anon key, ENCRYPTION_KEY, CRON_SECRET,
-#           Google OAuth credentials, Telegram bot token
+# fill in: Supabase URL + anon key + secret key, ENCRYPTION_KEY,
+#           CRON_SECRET, Google OAuth credentials, Telegram bot token
 # MONARCH_GRAPHQL_URL is pre-filled — no change needed
 
 # 3. database — apply all migrations via the Supabase SQL editor

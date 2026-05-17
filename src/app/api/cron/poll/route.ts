@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { processUserTransactions } from '@/lib/pipeline'
 
 export async function GET(request: Request) {
@@ -12,8 +12,18 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = await createClient()
-  const { data: users } = await supabase.from('gmail_connections').select('user_id')
+  let supabase
+  try {
+    supabase = createAdminClient()
+  } catch {
+    return Response.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
+
+  const { data: users, error: listError } = await supabase.from('gmail_connections').select('user_id')
+  if (listError) {
+    console.error('cron.poll.list_users_failed', listError)
+    return Response.json({ error: 'Failed to list users' }, { status: 500 })
+  }
   const summary = {
     processedUsers: 0,
     failedUsers: 0,

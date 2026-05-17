@@ -1,7 +1,7 @@
 import { google, gmail_v1 } from 'googleapis'
 import type { ParsedTransaction } from '@/lib/types/domain'
 import { parseUpiEmail } from '@/lib/parsers'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { decrypt } from '@/lib/crypto/encryption'
 
 function getIstMidnightCutoffEpochSeconds(daysBack: number) {
@@ -88,7 +88,7 @@ export type GmailFetchResult = {
 }
 
 export async function fetchGmailTransactions(userId: string): Promise<GmailFetchResult> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: connection, error } = await supabase
     .from('gmail_connections')
     .select('refresh_token_enc,last_history_id,email_address')

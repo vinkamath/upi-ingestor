@@ -1,5 +1,5 @@
 import { decrypt } from '@/lib/crypto/encryption'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type MonarchAuth = {
   token?: string
@@ -106,7 +106,7 @@ export async function getMonarchAuth(userId: string): Promise<{
   fxUsdPerInr: number | null
   fxRateDate: string | null
 }> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('monarch_connections')
     .select('email, credential_enc, default_account_id, fx_usd_per_inr, fx_rate_date')
@@ -206,7 +206,7 @@ export async function createMonarchTransaction(userId: string, payload: {
       try {
         const latest = await fetchPreviousCloseUsdPerInrWithRetry()
         usdPerInrRate = latest.rate
-        const supabase = await createClient()
+        const supabase = createAdminClient()
         const { error: updateError } = await supabase
           .from('monarch_connections')
           .update({
