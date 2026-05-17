@@ -70,6 +70,15 @@ function fmtDate(dateStr: string): string {
   })
 }
 
+function formatMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  const date = new Date(y, m - 1, 1)
+  if (y === new Date().getFullYear()) {
+    return date.toLocaleDateString('en-IN', { month: 'short' })
+  }
+  return date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+}
+
 function filterByRange(months: MonthData[], range: TimeRange): MonthData[] {
   const now = new Date()
   const y = now.getFullYear()
@@ -167,7 +176,7 @@ export default function AnalyticsPage() {
   const timeSeriesData = useMemo(
     () =>
       rangeMonths.map((m) => ({
-        month: m.label,
+        month: formatMonthLabel(m.month),
         ...m.categories,
       })),
     [rangeMonths]
@@ -234,7 +243,7 @@ export default function AnalyticsPage() {
                 >
                   {[...months].reverse().map((m) => (
                     <option key={m.month} value={m.month}>
-                      {m.label}
+                      {formatMonthLabel(m.month)}
                     </option>
                   ))}
                 </select>
@@ -245,7 +254,7 @@ export default function AnalyticsPage() {
                   {/* Summary strip */}
                   <div className="px-5 py-4 border-b border-border flex items-baseline justify-between gap-4">
                     <p className="text-[13px] text-muted-foreground">
-                      {currentMonthData.label} · {monthlyChartData.length} categories
+                      {formatMonthLabel(currentMonthData.month)} · {monthlyChartData.length} categories
                     </p>
                     <p className="text-[22px] font-semibold text-foreground leading-none">
                       {fmtINRFull(currentMonthData.total)}
