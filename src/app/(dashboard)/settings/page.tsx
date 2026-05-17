@@ -1,12 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Mail, Landmark, MessageSquare } from 'lucide-react'
+import { Wifi, WifiOff, Mail, Landmark, MessageSquare, ListOrdered, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { DEFAULT_PINNED_CATEGORY_NAMES } from '@/lib/monarch-categories'
+
+type MonarchCategoryOption = { id: string; name: string }
+
+const styledSelect =
+  'h-8 w-full rounded-lg border border-border bg-background text-[13px] text-foreground px-2 pr-7 focus:outline-none focus:ring-2 focus:ring-ring appearance-none'
+const selectStyle = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 8px center',
+}
 
 function ConnectionStatus({ connected }: { connected: boolean }) {
   return (
@@ -43,6 +54,11 @@ export default function SettingsPage() {
   const [isSavingMonarch, setIsSavingMonarch] = useState(false)
   const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
+  const [monarchCategories, setMonarchCategories] = useState<MonarchCategoryOption[]>([])
+  const [pinnedCategoryNames, setPinnedCategoryNames] = useState<string[]>([])
+  const [addCategoryName, setAddCategoryName] = useState('')
+  const [isSavingPinned, setIsSavingPinned] = useState(false)
+  const [pinnedMessage, setPinnedMessage] = useState<string | null>(null)
 
   async function loadGmailStatus() {
     const res = await fetch('/api/connect/gmail/status')
@@ -103,10 +119,86 @@ export default function SettingsPage() {
     setTelegramCode(json.linkCode)
   }
 
+  async function loadMonarchCategories() {
+    const res = await fetch('/api/connect/monarch/categories')
+    const json = await res.json()
+    if (!res.ok) return
+    setMonarchCategories((json?.categories ?? []) as MonarchCategoryOption[])
+  }
+
+  async function loadPinnedCategories() {
+    const res = await fetch('/api/settings/preferences')
+    const json = await res.json()
+    if (!res.ok) {
+      setPinnedMessage(json?.error ?? 'Failed to load quick categories')
+      return
+    }
+    const names = json?.pinnedCategoryNames
+    if (Array.isArray(names)) {
+      setPinnedCategoryNames(names.filter((n: unknown) => typeof n === 'string'))
+    }
+  }
+
+  async function savePinnedCategories() {
+    setPinnedMessage(null)
+    setIsSavingPinned(true)
+    const res = await fetch('/api/settings/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinnedCategoryNames }),
+    })
+    const json = await res.json()
+    setIsSavingPinned(false)
+    if (!res.ok) {
+      setPinnedMessage(`Failed to save: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setPinnedMessage('Quick categories saved.')
+  }
+
+  function addPinnedCategory(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const exists = pinnedCategoryNames.some(
+      (n) => n.localeCompare(trimmed, undefined, { sensitivity: 'accent' }) === 0
+    )
+    if (exists) return
+    setPinnedCategoryNames((prev) => [...prev, trimmed])
+    setAddCategoryName('')
+  }
+
+  function removePinnedCategory(index: number) {
+    setPinnedCategoryNames((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function movePinnedCategory(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= pinnedCategoryNames.length) return
+    setPinnedCategoryNames((prev) => {
+      const next = [...prev]
+      const [item] = next.splice(index, 1)
+      next.splice(nextIndex, 0, item)
+      return next
+    })
+  }
+
+  function resetPinnedToDefaults() {
+    setPinnedCategoryNames([...DEFAULT_PINNED_CATEGORY_NAMES])
+  }
+
+  const availableToPin = monarchCategories.filter(
+    (c) =>
+      !pinnedCategoryNames.some(
+        (n) => n.localeCompare(c.name, undefined, { sensitivity: 'accent' }) === 0
+      )
+  )
+
   useEffect(() => {
     const id = window.setTimeout(() => {
       void loadGmailStatus()
       void loadMonarchStatus()
+      void loadMonarchCategories()
+      void loadPinnedCategories()
     }, 0)
     return () => window.clearTimeout(id)
   }, [])
@@ -114,9 +206,9 @@ export default function SettingsPage() {
   return (
     <div className="p-4 md:p-6 space-y-5 md:space-y-6 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-[28px] leading-tight tracking-[-0.5px] text-foreground">Connections</h1>
+        <h1 className="text-[28px] leading-tight tracking-[-0.5px] text-foreground">Settings</h1>
         <p className="text-[13px] text-muted-foreground mt-0.5">
-          Manage your Gmail, Monarch Money, and Telegram integrations.
+          Connections, quick categories, and notifications.
         </p>
       </div>
 
@@ -223,6 +315,130 @@ export default function SettingsPage() {
           </Button>
           {monarchMessage && (
             <p className="text-[12px] text-muted-foreground">{monarchMessage}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick categories */}
+      <Card className="shadow-sm border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+              <ListOrdered className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-[15px]">Quick categories</CardTitle>
+              <CardDescription className="text-[12px]">
+                Pin categories to the top of transaction dropdowns, in this order.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {monarchCategories.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              Connect Monarch Money to load categories.
+            </p>
+          ) : (
+            <>
+              {pinnedCategoryNames.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {pinnedCategoryNames.map((name, index) => (
+                    <li
+                      key={`${name}-${index}`}
+                      className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2 py-1.5"
+                    >
+                      <span className="flex-1 text-[13px] text-foreground truncate">{name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        disabled={index === 0}
+                        onClick={() => movePinnedCategory(index, -1)}
+                        aria-label={`Move ${name} up`}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        disabled={index === pinnedCategoryNames.length - 1}
+                        onClick={() => movePinnedCategory(index, 1)}
+                        aria-label={`Move ${name} down`}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removePinnedCategory(index)}
+                        aria-label={`Remove ${name}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">No quick categories selected.</p>
+              )}
+
+              {availableToPin.length > 0 && (
+                <div className="flex gap-2">
+                  <select
+                    className={cn(styledSelect, 'flex-1')}
+                    style={selectStyle}
+                    value={addCategoryName}
+                    onChange={(e) => setAddCategoryName(e.target.value)}
+                  >
+                    <option value="">Add category…</option>
+                    {availableToPin.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={!addCategoryName}
+                    onClick={() => addPinnedCategory(addCategoryName)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={savePinnedCategories}
+              disabled={isSavingPinned}
+              size="sm"
+              className="flex-1 min-w-[120px]"
+            >
+              {isSavingPinned ? 'Saving…' : 'Save quick categories'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetPinnedToDefaults}
+              disabled={isSavingPinned}
+            >
+              Reset defaults
+            </Button>
+          </div>
+          {pinnedMessage && (
+            <p className="text-[12px] text-muted-foreground">{pinnedMessage}</p>
           )}
         </CardContent>
       </Card>
