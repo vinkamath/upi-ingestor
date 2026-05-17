@@ -54,6 +54,13 @@ export default function SettingsPage() {
   const [isSavingMonarch, setIsSavingMonarch] = useState(false)
   const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
+  const [telegramStatus, setTelegramStatus] = useState<{
+    linked: boolean
+    linkedAt: string | null
+  } | null>(null)
+  const [telegramTestChatId, setTelegramTestChatId] = useState('')
+  const [telegramTestMessage, setTelegramTestMessage] = useState<string | null>(null)
+  const [isSendingTelegramTest, setIsSendingTelegramTest] = useState(false)
   const [monarchCategories, setMonarchCategories] = useState<MonarchCategoryOption[]>([])
   const [pinnedCategoryNames, setPinnedCategoryNames] = useState<string[]>([])
   const [addCategoryName, setAddCategoryName] = useState('')
@@ -113,10 +120,42 @@ export default function SettingsPage() {
     }))
   }
 
+  async function loadTelegramStatus() {
+    const res = await fetch('/api/connect/telegram')
+    const json = await res.json()
+    if (!res.ok) {
+      setTelegramTestMessage(`Failed to load status: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setTelegramStatus(json)
+  }
+
   async function createTelegramLink() {
     const res = await fetch('/api/connect/telegram', { method: 'POST' })
     const json = await res.json()
     setTelegramCode(json.linkCode)
+    await loadTelegramStatus()
+  }
+
+  async function sendTelegramTest() {
+    setTelegramTestMessage(null)
+    setIsSendingTelegramTest(true)
+    const res = await fetch('/api/connect/telegram/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...(telegramTestChatId.trim() ? { chatId: telegramTestChatId.trim() } : {}),
+      }),
+    })
+    const json = await res.json()
+    setIsSendingTelegramTest(false)
+
+    if (!res.ok) {
+      setTelegramTestMessage(json?.error ?? 'Failed to send test message')
+      return
+    }
+
+    setTelegramTestMessage('Test message sent — check your Telegram bot chat.')
   }
 
   async function loadMonarchCategories() {
@@ -199,6 +238,7 @@ export default function SettingsPage() {
       void loadMonarchStatus()
       void loadMonarchCategories()
       void loadPinnedCategories()
+      void loadTelegramStatus()
     }, 0)
     return () => window.clearTimeout(id)
   }, [])
@@ -446,16 +486,21 @@ export default function SettingsPage() {
       {/* Telegram */}
       <Card className="shadow-sm border-border">
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center justify-between flex-wrap gap-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-[15px]">Telegram</CardTitle>
+                <CardDescription className="text-[12px]">
+                  Get transaction notifications via Telegram bot
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-[15px]">Telegram</CardTitle>
-              <CardDescription className="text-[12px]">
-                Get transaction notifications via Telegram bot
-              </CardDescription>
-            </div>
+            {telegramStatus && (
+              <ConnectionStatus connected={telegramStatus.linked} />
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -466,9 +511,35 @@ export default function SettingsPage() {
             <div className="rounded-lg bg-muted px-3 py-2.5 text-[12px] text-foreground font-mono">
               /start {telegramCode}
               <p className="text-muted-foreground font-sans mt-1 text-[11px]">
-                Run this command in your Telegram bot chat.
+                Run this command in your Telegram bot chat (requires webhook — see docs).
               </p>
             </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="telegram-test-chat-id" className="text-[12px]">
+              Chat ID for test (optional)
+            </Label>
+            <Input
+              id="telegram-test-chat-id"
+              className="h-8 text-[13px] font-mono"
+              placeholder="e.g. 123456789"
+              value={telegramTestChatId}
+              onChange={(e) => setTelegramTestChatId(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Message @userinfobot on Telegram to get your numeric ID, or link above and leave this blank.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={sendTelegramTest}
+            disabled={isSendingTelegramTest || (!telegramStatus?.linked && !telegramTestChatId.trim())}
+          >
+            {isSendingTelegramTest ? 'Sending…' : 'Send test message'}
+          </Button>
+          {telegramTestMessage && (
+            <p className="text-[12px] text-muted-foreground">{telegramTestMessage}</p>
           )}
         </CardContent>
       </Card>

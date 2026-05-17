@@ -11,9 +11,12 @@ export async function sendTelegramMessage(chatId: string, text: string, replyMar
     }),
   })
 
-  if (!response.ok) {
-    throw new Error(`Telegram send failed: ${response.status}`)
+  const data = (await response.json()) as { ok?: boolean; description?: string; result?: { message_id?: number } }
+
+  if (!response.ok || data.ok === false) {
+    const detail = data.description ?? `HTTP ${response.status}`
+    throw new Error(`Telegram send failed: ${detail}`)
   }
 
-  return response.json()
+  return data
 }

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { publishers } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
 import { sendTelegramMessage } from '@/lib/telegram/client'
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   let body: unknown
   try {
     body = await request.json()
