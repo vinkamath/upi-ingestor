@@ -1,7 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Mail, Landmark, MessageSquare, ListOrdered, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Wifi,
+  WifiOff,
+  Mail,
+  Landmark,
+  MessageSquare,
+  ListOrdered,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Copy,
+  Check,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +66,8 @@ export default function SettingsPage() {
   const [isSavingMonarch, setIsSavingMonarch] = useState(false)
   const [monarchMessage, setMonarchMessage] = useState<string | null>(null)
   const [telegramCode, setTelegramCode] = useState<string | null>(null)
+  const [telegramLinkCopied, setTelegramLinkCopied] = useState(false)
+  const telegramLinkCopiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [telegramStatus, setTelegramStatus] = useState<{
     linked: boolean
     linkedAt: string | null
@@ -134,7 +148,26 @@ export default function SettingsPage() {
     const res = await fetch('/api/connect/telegram', { method: 'POST' })
     const json = await res.json()
     setTelegramCode(json.linkCode)
+    setTelegramLinkCopied(false)
     await loadTelegramStatus()
+  }
+
+  async function copyTelegramStartCommand() {
+    if (!telegramCode) return
+    const command = `/start ${telegramCode}`
+    try {
+      await navigator.clipboard.writeText(command)
+      setTelegramLinkCopied(true)
+      if (telegramLinkCopiedTimeoutRef.current) {
+        clearTimeout(telegramLinkCopiedTimeoutRef.current)
+      }
+      telegramLinkCopiedTimeoutRef.current = setTimeout(() => {
+        setTelegramLinkCopied(false)
+        telegramLinkCopiedTimeoutRef.current = null
+      }, 2000)
+    } catch {
+      setTelegramTestMessage('Could not copy — select the command and copy manually.')
+    }
   }
 
   async function sendTelegramTest() {
@@ -241,6 +274,14 @@ export default function SettingsPage() {
       void loadTelegramStatus()
     }, 0)
     return () => window.clearTimeout(id)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (telegramLinkCopiedTimeoutRef.current) {
+        clearTimeout(telegramLinkCopiedTimeoutRef.current)
+      }
+    }
   }, [])
 
   return (
@@ -508,10 +549,39 @@ export default function SettingsPage() {
             Generate link code
           </Button>
           {telegramCode && (
-            <div className="rounded-lg bg-muted px-3 py-2.5 text-[12px] text-foreground font-mono">
-              /start {telegramCode}
-              <p className="text-muted-foreground font-sans mt-1 text-[11px]">
-                Run this command in your Telegram bot chat (requires webhook — see docs).
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1 rounded-lg bg-muted pl-3 pr-1 py-1.5">
+                <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground">
+                  /start {telegramCode}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => void copyTelegramStartCommand()}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition-colors',
+                    telegramLinkCopied
+                      ? 'text-positive'
+                      : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
+                  )}
+                  aria-label={telegramLinkCopied ? 'Copied to clipboard' : 'Copy command to clipboard'}
+                >
+                  {telegramLinkCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" aria-hidden />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Paste this in your bot chat. The bot should reply within a few seconds — if it stays
+                silent, the Telegram webhook is not reaching this app (localhost won&apos;t work; use a
+                deployed URL or ngrok).
+              </p>
+              <p className="sr-only" role="status" aria-live="polite">
+                {telegramLinkCopied ? 'Command copied to clipboard' : ''}
               </p>
             </div>
           )}

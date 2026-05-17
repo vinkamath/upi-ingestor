@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { publishers } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
 import { sendTelegramMessage } from '@/lib/telegram/client'
+import { parseStartLinkCode } from '@/lib/telegram/start-command'
 
 export async function POST(request: Request) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -24,8 +25,21 @@ export async function POST(request: Request) {
   const text = typeof message?.text === 'string' ? message.text : undefined
   const chatObj = typeof message?.chat === 'object' && message.chat !== null ? (message.chat as Record<string, unknown>) : undefined
   const chatId = chatObj?.id ? String(chatObj.id) : null
-  if (text?.startsWith('/start ') && chatId) {
-    const linkCode = text.replace('/start ', '').trim()
+  const startLinkCode = text ? parseStartLinkCode(text) : undefined
+  if (startLinkCode !== undefined && chatId) {
+    if (startLinkCode === null) {
+      try {
+        await sendTelegramMessage(
+          chatId,
+          'Paste the full command from UPI Ingestor Settings (including the code after /start).'
+        )
+      } catch (error) {
+        console.error('telegram.link_help_reply_failed', { chatId, error })
+      }
+      return Response.json({ ok: true })
+    }
+
+    const linkCode = startLinkCode
     const { data: link } = await supabase
       .from('telegram_links')
       .select('user_id')
