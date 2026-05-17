@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Trash2, Upload, CheckSquare, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
+import { buildMonarchTransactionsUrl, toTransactionYmd } from '@/lib/monarch-url'
+import { partitionMonarchCategoriesForPicker } from '@/lib/monarch-categories'
 import {
   Table,
   TableBody,
@@ -34,6 +36,15 @@ type TxStatusFilter = 'all' | Tx['status']
 type MonarchCategoryOption = {
   id: string
   name: string
+}
+
+type StatusMessage = {
+  text: string
+  monarchHref?: string
+}
+
+function txDateYmd(tx: Tx) {
+  return toTransactionYmd(tx.email_received_at ?? tx.occurred_at)
 }
 
 const STATUS_CONFIG: Record<
@@ -75,7 +86,9 @@ export default function TransactionsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [publishingAll, setPublishingAll] = useState(false)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
-  const [fetchMessage, setFetchMessage] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null)
+  const [defaultAccountId, setDefaultAccountId] = useState<string | null>(null)
+  const [pinnedCategoryNames, setPinnedCategoryNames] = useState<string[]>([])
 
   async function load() {
     setIsLoading(true)
@@ -111,23 +124,39 @@ export default function TransactionsPage() {
     setCategories((json?.categories ?? []) as MonarchCategoryOption[])
   }
 
+  async function loadMonarchConnection() {
+    const res = await fetch('/api/connect/monarch')
+    const json = await res.json()
+    if (!res.ok) return
+    const accountId = typeof json?.defaultAccountId === 'string' ? json.defaultAccountId : null
+    setDefaultAccountId(accountId || null)
+  }
+
+  async function loadPinnedCategories() {
+    const res = await fetch('/api/settings/preferences')
+    const json = await res.json()
+    if (!res.ok) return
+    const names = json?.pinnedCategoryNames
+    if (Array.isArray(names)) setPinnedCategoryNames(names.filter((n: unknown) => typeof n === 'string'))
+  }
+
   async function fetchNow() {
-    setFetchMessage('Fetching latest Gmail transactions…')
+    setStatusMessage({ text: 'Fetching latest Gmail transactions…' })
     const res = await fetch('/api/gmail/fetch-now', { method: 'POST' })
     if (!res.ok) {
-      setFetchMessage('Fetch failed. Check server logs and try again.')
+      setStatusMessage({ text: 'Fetch failed. Check server logs and try again.' })
       return
     }
     const json = await res.json()
     const summary = json?.summary
     const count = await load()
     if (summary) {
-      setFetchMessage(
-        `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${count} total`
-      )
+      setStatusMessage({
+        text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${count} total`,
+      })
       return
     }
-    setFetchMessage(`Fetch complete — ${count} transaction(s) loaded.`)
+    setStatusMessage({ text: `Fetch complete — ${count} transaction(s) loaded.` })
   }
 
   async function deleteTransaction(id: string) {
@@ -138,19 +167,19 @@ export default function TransactionsPage() {
     setDeletingId(id)
     const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
     if (!res.ok) {
-      setFetchMessage('Failed to delete transaction. Please try again.')
+      setStatusMessage({ text: 'Failed to delete transaction. Please try again.' })
       setDeletingId(null)
       return
     }
     await load()
     setDeletingId(null)
-    setFetchMessage('Transaction deleted. You can refetch now to apply new rules.')
+    setStatusMessage({ text: 'Transaction deleted. You can refetch now to apply new rules.' })
   }
 
   async function saveSelectedCategories() {
     const ids = filteredTxs.map((tx) => tx.id).filter((id) => selectedIds[id])
     if (ids.length === 0) {
-      setFetchMessage('Select at least one transaction.')
+      setStatusMessage({ text: 'Select at least one transaction.' })
       return
     }
     setSavingCategoryId('__bulk__')
@@ -171,16 +200,17 @@ export default function TransactionsPage() {
     }
     await load()
     setSavingCategoryId(null)
-    setFetchMessage(
-      failCount === 0
-        ? `Saved category for ${successCount} transaction(s).`
-        : `Saved ${successCount}, failed ${failCount}.`
-    )
+    setStatusMessage({
+      text:
+        failCount === 0
+          ? `Saved category for ${successCount} transaction(s).`
+          : `Saved ${successCount}, failed ${failCount}.`,
+    })
   }
 
   async function deleteSelectedTransactions() {
     const ids = filteredTxs.map((tx) => tx.id).filter((id) => selectedIds[id])
-    if (ids.length === 0) { setFetchMessage('Select at least one transaction.'); return }
+    if (ids.length === 0) { setStatusMessage({ text: 'Select at least one transaction.' }); return }
     const shouldDelete = window.confirm(`Delete ${ids.length} transaction(s)?`)
     if (!shouldDelete) return
     setDeletingId('__bulk__')
@@ -195,11 +225,56 @@ export default function TransactionsPage() {
     }
     await load()
     setDeletingId(null)
-    setFetchMessage(
-      failCount === 0
-        ? `Deleted ${successCount} transaction(s).`
-        : `Deleted ${successCount}, failed ${failCount}.`
-    )
+    setStatusMessage({
+      text:
+        failCount === 0
+          ? `Deleted ${successCount} transaction(s).`
+          : `Deleted ${successCount}, failed ${failCount}.`,
+    })
+  }
+
+  function monarchHrefForPublishedDates(dates: string[]) {
+    if (!defaultAccountId || dates.length === 0) return undefined
+    const startDate = dates.reduce((earliest, date) => (date < earliest ? date : earliest))
+    const endDate = dates.reduce((latest, date) => (date > latest ? date : latest))
+    return buildMonarchTransactionsUrl(defaultAccountId, startDate, endDate)
+  }
+
+  async function publishTransactions(eligible: { id: string; category: string }[]) {
+    setPublishingAll(true)
+    const txById = new Map(txs.map((tx) => [tx.id, tx]))
+    let successCount = 0
+    let failCount = 0
+    const publishedDates: string[] = []
+    for (const row of eligible) {
+      try {
+        const res = await fetch(`/api/transactions/${row.id}/republish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: row.category }),
+        })
+        if (res.ok) {
+          successCount += 1
+          const tx = txById.get(row.id)
+          const ymd = tx ? txDateYmd(tx) : null
+          if (ymd) publishedDates.push(ymd)
+        } else {
+          failCount += 1
+        }
+      } catch {
+        failCount += 1
+      }
+    }
+    await load()
+    setPublishingAll(false)
+    const monarchHref = monarchHrefForPublishedDates(publishedDates)
+    setStatusMessage({
+      text:
+        failCount === 0
+          ? `Published ${successCount} transaction(s).`
+          : `Published ${successCount}, failed ${failCount}.`,
+      monarchHref: successCount > 0 ? monarchHref : undefined,
+    })
   }
 
   async function publishSelectedTransactions() {
@@ -208,30 +283,10 @@ export default function TransactionsPage() {
       .map((tx) => ({ id: tx.id, category: categoryDrafts[tx.id]?.trim() }))
       .filter((row): row is { id: string; category: string } => Boolean(row.category))
     if (eligible.length === 0) {
-      setFetchMessage('Select at least one transaction with an assigned category.')
+      setStatusMessage({ text: 'Select at least one transaction with an assigned category.' })
       return
     }
-    setPublishingAll(true)
-    let successCount = 0
-    let failCount = 0
-    for (const row of eligible) {
-      try {
-        const res = await fetch(`/api/transactions/${row.id}/republish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: row.category }),
-        })
-        if (res.ok) successCount += 1
-        else failCount += 1
-      } catch { failCount += 1 }
-    }
-    await load()
-    setPublishingAll(false)
-    setFetchMessage(
-      failCount === 0
-        ? `Published ${successCount} transaction(s).`
-        : `Published ${successCount}, failed ${failCount}.`
-    )
+    await publishTransactions(eligible)
   }
 
   async function publishAllVisible() {
@@ -240,36 +295,18 @@ export default function TransactionsPage() {
       .map((tx) => ({ id: tx.id, category: categoryDrafts[tx.id]?.trim() }))
       .filter((row): row is { id: string; category: string } => Boolean(row.category))
     if (eligible.length === 0) {
-      setFetchMessage('No unpublished transactions with a category in the current view.')
+      setStatusMessage({ text: 'No unpublished transactions with a category in the current view.' })
       return
     }
-    setPublishingAll(true)
-    let successCount = 0
-    let failCount = 0
-    for (const row of eligible) {
-      try {
-        const res = await fetch(`/api/transactions/${row.id}/republish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: row.category }),
-        })
-        if (res.ok) successCount += 1
-        else failCount += 1
-      } catch { failCount += 1 }
-    }
-    await load()
-    setPublishingAll(false)
-    setFetchMessage(
-      failCount === 0
-        ? `Published ${successCount} transaction(s).`
-        : `Published ${successCount}, failed ${failCount}.`
-    )
+    await publishTransactions(eligible)
   }
 
   useEffect(() => {
     const id = window.setTimeout(() => {
       void load()
       void loadCategories()
+      void loadMonarchConnection()
+      void loadPinnedCategories()
     }, 0)
     return () => window.clearTimeout(id)
   }, [])
@@ -279,9 +316,15 @@ export default function TransactionsPage() {
   const selectedCount = filteredTxs.reduce((count, tx) => count + (selectedIds[tx.id] ? 1 : 0), 0)
   const allSelected = filteredTxs.length > 0 && selectedCount === filteredTxs.length
   const isBusy = isLoading || publishingAll || Boolean(deletingId) || Boolean(savingCategoryId)
+  const categoryGroups = useMemo(
+    () => partitionMonarchCategoriesForPicker(categories, pinnedCategoryNames),
+    [categories, pinnedCategoryNames]
+  )
 
   function CategoryField({ txId, category }: { txId: string; category: string | null }) {
-    if (categories.length > 0) {
+    const hasCategories = categories.length > 0
+    if (hasCategories) {
+      const { pinned, rest } = categoryGroups
       return (
         <select
           className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
@@ -290,9 +333,20 @@ export default function TransactionsPage() {
           onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [txId]: e.target.value }))}
         >
           <option value="" disabled>Select category</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.name}>{c.name}</option>
-          ))}
+          {pinned.length > 0 && (
+            <optgroup label="Quick categories">
+              {pinned.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </optgroup>
+          )}
+          {rest.length > 0 && (
+            <optgroup label={pinned.length > 0 ? 'All categories' : 'Categories'}>
+              {rest.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
       )
     }
@@ -399,10 +453,25 @@ export default function TransactionsPage() {
       </div>
 
       {/* Status message */}
-      {fetchMessage && (
+      {statusMessage && (
         <div className="flex items-start gap-2 rounded-lg bg-card border border-border px-4 py-2.5 text-[13px] text-foreground">
           <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <span>{fetchMessage}</span>
+          <span>
+            {statusMessage.text}
+            {statusMessage.monarchHref && (
+              <>
+                {' '}
+                <a
+                  href={statusMessage.monarchHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+                >
+                  Review in Monarch
+                </a>
+              </>
+            )}
+          </span>
         </div>
       )}
 
