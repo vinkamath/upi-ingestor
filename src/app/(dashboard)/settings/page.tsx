@@ -56,6 +56,7 @@ export default function SettingsPage() {
     lastUpdatedAt: string | null
     fetchSinceDate: string | null
     defaultFetchDaysBack: number
+    fetchMaxResults: number
   } | null>(null)
   const [gmailFetchSinceDate, setGmailFetchSinceDate] = useState('')
   const [isSavingGmailFetch, setIsSavingGmailFetch] = useState(false)
@@ -369,8 +370,8 @@ export default function SettingsPage() {
                   {!gmailStatus?.connected
                     ? 'Connect Gmail above to set how far back imports should go.'
                     : gmailStatus.fetchSinceDate
-                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight).`
-                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s).`}
+                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`
+                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
