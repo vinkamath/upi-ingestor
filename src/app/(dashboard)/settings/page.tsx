@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  Wifi,
-  WifiOff,
+  CircleCheck,
+  CircleDashed,
   Mail,
   Landmark,
   MessageSquare,
@@ -40,9 +40,9 @@ function ConnectionStatus({ connected }: { connected: boolean }) {
       )}
     >
       {connected ? (
-        <Wifi className="h-3.5 w-3.5" />
+        <CircleCheck className="h-3.5 w-3.5" />
       ) : (
-        <WifiOff className="h-3.5 w-3.5" />
+        <CircleDashed className="h-3.5 w-3.5" />
       )}
       {connected ? 'Connected' : 'Not connected'}
     </span>
@@ -54,7 +54,12 @@ export default function SettingsPage() {
     connected: boolean
     emailAddress: string | null
     lastUpdatedAt: string | null
+    fetchSinceDate: string | null
+    defaultFetchDaysBack: number
   } | null>(null)
+  const [gmailFetchSinceDate, setGmailFetchSinceDate] = useState('')
+  const [isSavingGmailFetch, setIsSavingGmailFetch] = useState(false)
+  const [gmailFetchMessage, setGmailFetchMessage] = useState<string | null>(null)
   const [monarch, setMonarch] = useState({ email: '', credential: '', defaultAccountId: '' })
   const [monarchStatus, setMonarchStatus] = useState<{
     connected: boolean
@@ -84,7 +89,37 @@ export default function SettingsPage() {
   async function loadGmailStatus() {
     const res = await fetch('/api/connect/gmail/status')
     const json = await res.json()
+    if (!res.ok) {
+      setGmailFetchMessage(`Failed to load Gmail settings: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
     setGmailStatus(json)
+    setGmailFetchSinceDate(json.fetchSinceDate ?? '')
+  }
+
+  async function saveGmailFetchSinceDate(fetchSinceDate: string | null) {
+    setGmailFetchMessage(null)
+    setIsSavingGmailFetch(true)
+    const res = await fetch('/api/connect/gmail/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fetchSinceDate }),
+    })
+    const json = await res.json()
+    setIsSavingGmailFetch(false)
+
+    if (!res.ok) {
+      setGmailFetchMessage(`Failed to save: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+
+    setGmailFetchSinceDate(json.fetchSinceDate ?? '')
+    setGmailFetchMessage(
+      json.fetchSinceDate
+        ? `Imports will start from ${json.fetchSinceDate} (IST).`
+        : `Using default: last ${json.defaultFetchDaysBack} day(s).`
+    )
+    await loadGmailStatus()
   }
 
   async function saveMonarch() {
@@ -311,12 +346,60 @@ export default function SettingsPage() {
             <ConnectionStatus connected={gmailStatus?.connected ?? false} />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <Button asChild variant={gmailStatus?.connected ? 'outline' : 'default'} size="sm">
             <a href="/api/auth/google?next=/settings">
               {gmailStatus?.connected ? 'Reconnect Gmail' : 'Connect with Google'}
             </a>
           </Button>
+          <div className="space-y-3 pt-3 border-t border-border">
+              <div className="space-y-1.5">
+                <Label htmlFor="gmail-fetch-since" className="text-[12px]">
+                  Earliest import date
+                </Label>
+                <Input
+                  id="gmail-fetch-since"
+                  type="date"
+                  className="h-8 text-[13px] max-w-[220px]"
+                  value={gmailFetchSinceDate}
+                  disabled={!gmailStatus?.connected || isSavingGmailFetch}
+                  onChange={(e) => setGmailFetchSinceDate(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {!gmailStatus?.connected
+                    ? 'Connect Gmail above to set how far back imports should go.'
+                    : gmailStatus.fetchSinceDate
+                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight).`
+                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s).`}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!gmailStatus?.connected || isSavingGmailFetch}
+                  onClick={() =>
+                    void saveGmailFetchSinceDate(gmailFetchSinceDate.trim() ? gmailFetchSinceDate : null)
+                  }
+                >
+                  {isSavingGmailFetch ? 'Saving…' : 'Save import range'}
+                </Button>
+                {gmailStatus?.connected && gmailStatus.fetchSinceDate ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isSavingGmailFetch}
+                    onClick={() => void saveGmailFetchSinceDate(null)}
+                  >
+                    Use default window
+                  </Button>
+                ) : null}
+              </div>
+            {gmailFetchMessage ? (
+              <p className="text-[12px] text-muted-foreground">{gmailFetchMessage}</p>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
