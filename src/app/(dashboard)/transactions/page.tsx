@@ -70,8 +70,6 @@ const STATUS_CONFIG: Record<
   },
 }
 
-const chevronSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
-const chevronStyle = { backgroundImage: chevronSvg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }
 const chevronSmallSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
 const chevronSmallStyle = { backgroundImage: chevronSmallSvg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }
 
@@ -398,24 +396,36 @@ export default function TransactionsPage() {
 
       {/* Toolbar */}
       <div className="space-y-2">
-        {/* Status filter */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="status-filter" className="text-[13px] text-muted-foreground shrink-0">
-            Status
-          </label>
-          <select
-            id="status-filter"
-            className="h-8 rounded-lg border border-border bg-card text-[13px] text-foreground px-2 pr-7 focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
-            style={chevronStyle}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as TxStatusFilter)}
-          >
-            <option value="all">All</option>
-            <option value="pending">Pending</option>
-            <option value="needs_review">Needs review</option>
-            <option value="failed">Failed</option>
-            <option value="published">Published</option>
-          </select>
+        {/* Status filter pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 border-b border-border/50 flex-nowrap md:flex-wrap">
+          {(
+            [
+              { value: 'all', label: 'All' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'needs_review', label: 'Review' },
+              { value: 'failed', label: 'Failed' },
+              { value: 'published', label: 'Published' },
+            ] as { value: TxStatusFilter; label: string }[]
+          ).map(({ value, label }) => {
+            const isActive = statusFilter === value
+            const statusCfg = value !== 'all' ? STATUS_CONFIG[value as Tx['status']] : null
+            return (
+              <button
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={cn(
+                  'h-7 px-3 rounded-full border text-[12px] font-medium transition-colors shrink-0 whitespace-nowrap cursor-pointer',
+                  isActive
+                    ? value === 'all'
+                      ? 'bg-foreground/10 text-foreground border-foreground/20'
+                      : statusCfg?.className
+                    : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Bulk actions — horizontally scrollable on mobile */}
