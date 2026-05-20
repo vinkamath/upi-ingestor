@@ -1,9 +1,8 @@
 import { decrypt } from '@/lib/crypto/encryption'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { deserializeMonarchSession, monarchGraphqlFetch } from './session'
 
 type MonarchAuth = {
-  token?: string
-  password?: string
   authTag: string
   iv: string
   content: string
@@ -15,13 +14,6 @@ type MonarchConnectionRow = {
   default_account_id: string | null
   fx_usd_per_inr: string | number | null
   fx_rate_date: string | null
-}
-
-function buildTokenHeader(secret: string) {
-  const trimmed = secret.trim()
-  if (trimmed.toLowerCase().startsWith('token ')) return trimmed
-  if (trimmed.toLowerCase().startsWith('bearer ')) return `Token ${trimmed.slice(7).trim()}`
-  return `Token ${trimmed}`
 }
 
 function toMonarchDate(value: string) {
@@ -101,7 +93,7 @@ async function fetchPreviousCloseUsdPerInrWithRetry(): Promise<{ rate: number; r
 
 export async function getMonarchAuth(userId: string): Promise<{
   email: string
-  secret: string
+  session: ReturnType<typeof deserializeMonarchSession>
   defaultAccountId: string | null
   fxUsdPerInr: number | null
   fxRateDate: string | null
@@ -116,13 +108,12 @@ export async function getMonarchAuth(userId: string): Promise<{
   if (error || !data) throw new Error('Monarch connection missing')
 
   const row = data as MonarchConnectionRow
-  const credential = row.credential_enc as MonarchAuth
-  const secret = decrypt(credential)
+  const session = deserializeMonarchSession(decrypt(row.credential_enc))
   const parsedRate = row.fx_usd_per_inr == null ? null : Number(row.fx_usd_per_inr)
   const fxUsdPerInr = Number.isFinite(parsedRate) && parsedRate && parsedRate > 0 ? parsedRate : null
   return {
     email: row.email,
-    secret,
+    session,
     defaultAccountId: row.default_account_id,
     fxUsdPerInr,
     fxRateDate: row.fx_rate_date,
@@ -138,30 +129,18 @@ export async function createMonarchTransaction(userId: string, payload: {
 }) {
   const auth = await getMonarchAuth(userId)
 
-  const graphqlUrl = process.env.MONARCH_GRAPHQL_URL ?? 'https://api.monarch.com/graphql'
-
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 10000)
 
   try {
-    const executeGraphql = async (query: string, variables: Record<string, unknown>) => {
-      const response = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: buildTokenHeader(auth.secret),
-        },
-        body: JSON.stringify({ query, variables }),
-        signal: controller.signal,
-      })
-      const json = await response.json()
-      return { response, json }
-    }
+    const executeGraphql = async <TData = Record<string, unknown>>(
+      query: string,
+      variables: Record<string, unknown> = {}
+    ) => monarchGraphqlFetch<TData>(auth.session, query, variables, { signal: controller.signal })
 
-    const { response: categoriesResponse, json: categoriesJson } = await executeGraphql(
-      `query RuleCategories { categories { id name } }`,
-      {}
-    )
+    const { response: categoriesResponse, json: categoriesJson } = await executeGraphql<{
+      categories?: Array<{ id?: string; name?: string }>
+    }>(`query RuleCategories { categories { id name } }`, {})
     const categories = (categoriesJson?.data?.categories ?? []) as Array<{ id?: string; name?: string }>
     if (!categoriesResponse.ok || !Array.isArray(categories)) {
       throw new Error(`Monarch category lookup failed: ${JSON.stringify(categoriesJson)}`)
@@ -178,7 +157,9 @@ export async function createMonarchTransaction(userId: string, payload: {
       throw new Error(`Monarch category not found for "${payload.category}"`)
     }
 
-    const { response: tagsResponse, json: tagsJson } = await executeGraphql(
+    const { response: tagsResponse, json: tagsJson } = await executeGraphql<{
+      householdTransactionTags?: Array<{ id?: string; name?: string }>
+    }>(
       `query RuleTags($search: String, $limit: Int) {
         householdTransactionTags(search: $search, limit: $limit) {
           id
@@ -230,7 +211,12 @@ export async function createMonarchTransaction(userId: string, payload: {
 
     const amountInUsd = toUsdAmountFromInr(payload.amount, usdPerInrRate)
     const signedAmount = amountInUsd > 0 ? -amountInUsd : amountInUsd
-    const { response, json } = await executeGraphql(
+    const { response, json } = await executeGraphql<{
+      createTransaction?: {
+        transaction?: { id?: string }
+        errors?: Array<{ message?: string; code?: string }>
+      }
+    }>(
       `mutation Common_CreateTransactionMutation($input: CreateTransactionMutationInput!) {
         createTransaction(input: $input) {
           transaction { id }
@@ -253,7 +239,12 @@ export async function createMonarchTransaction(userId: string, payload: {
     const createErrors = (json?.data?.createTransaction?.errors ?? []) as Array<{ message?: string }>
     const id = json?.data?.createTransaction?.transaction?.id as string | undefined
     if (response.ok && topLevelErrors.length === 0 && createErrors.length === 0 && id) {
-      const { response: setTagsResponse, json: setTagsJson } = await executeGraphql(
+      const { response: setTagsResponse, json: setTagsJson } = await executeGraphql<{
+        setTransactionTags?: {
+          transaction?: { id?: string; tags?: Array<{ id?: string; name?: string }> }
+          errors?: Array<{ message?: string; code?: string }>
+        }
+      }>(
         `mutation Web_SetTransactionTags($input: SetTransactionTagsInput!) {
           setTransactionTags(input: $input) {
             errors { message code }

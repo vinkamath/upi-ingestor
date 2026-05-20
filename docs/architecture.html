@@ -172,7 +172,7 @@
     <h2>Overview</h2>
     <p>UPI Ingestor is a personal finance automation pipeline built as a single Next.js application deployed on Vercel. It has no background workers or queues — the entire flow runs synchronously inside a single function invocation, triggered either by a daily cron job or a manual fetch from the dashboard.</p>
     <div class="callout">
-      <strong>Security:</strong> Every credential (Gmail OAuth tokens, Monarch password) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>. Browser-facing routes use the publishable/anon key with SSR sessions; the cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> (server-only, never exposed to the client).
+      <strong>Security:</strong> Every credential (Gmail OAuth tokens, Monarch session cookies) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>. Browser-facing routes use the publishable/anon key with SSR sessions; the cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> (server-only, never exposed to the client).
     </div>
   </section>
 

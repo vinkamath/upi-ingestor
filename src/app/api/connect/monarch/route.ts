@@ -1,5 +1,11 @@
 import { getUser } from '@/lib/db/server'
 import { decrypt, encrypt } from '@/lib/crypto/encryption'
+import {
+  deserializeMonarchSession,
+  fetchMonarchAccounts,
+  parseMonarchSessionInput,
+  serializeMonarchSession,
+} from '@/lib/publishers/monarch/session'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -8,47 +14,22 @@ const schema = z.object({
   defaultAccountId: z.string().optional(),
 })
 
-function normalizeCredential(input: string) {
-  const value = input.trim()
-  if (value.toLowerCase().startsWith('token ')) return value.slice(6).trim()
-  if (value.toLowerCase().startsWith('bearer ')) return value.slice(7).trim()
-  return value
-}
-
-async function fetchMonarchAccounts(credential: string) {
-  const graphqlUrl = process.env.MONARCH_GRAPHQL_URL
-  if (!graphqlUrl) return null
-
-  const response = await fetch(graphqlUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Token ${credential}`,
-    },
-    body: JSON.stringify({
-      query: `query ConnectionCheck { accounts { id displayName name } }`,
-      variables: {},
-    }),
-  })
-
-  const json = await response.json()
-  const accounts = (json?.data?.accounts ?? []) as Array<{ id: string; displayName?: string; name?: string }>
-  if (!response.ok || !Array.isArray(accounts)) return null
-
-  return accounts.map((account) => ({
-    id: account.id,
-    name: account.displayName || account.name || account.id,
-  }))
-}
-
-async function validateMonarchCredential(credential: string, defaultAccountId?: string) {
+async function validateMonarchSession(sessionInput: string, defaultAccountId?: string) {
   if (!process.env.MONARCH_GRAPHQL_URL) {
     return { ok: false as const, error: 'MONARCH_GRAPHQL_URL not set' }
   }
 
-  const accountOptions = await fetchMonarchAccounts(credential)
+  let session
+  try {
+    session = parseMonarchSessionInput(sessionInput)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid Monarch session cookies'
+    return { ok: false as const, error: message }
+  }
+
+  const accountOptions = await fetchMonarchAccounts(session)
   if (!accountOptions) {
-    return { ok: false as const, error: 'Monarch credential check failed' }
+    return { ok: false as const, error: 'Monarch session check failed' }
   }
 
   if (defaultAccountId && !accountOptions.some((account) => account.id === defaultAccountId)) {
@@ -58,7 +39,7 @@ async function validateMonarchCredential(credential: string, defaultAccountId?: 
     }
   }
 
-  return { ok: true as const, accountCount: accountOptions.length, accounts: accountOptions }
+  return { ok: true as const, session, accountCount: accountOptions.length, accounts: accountOptions }
 }
 
 export async function GET() {
@@ -80,8 +61,15 @@ export async function GET() {
     })
   }
 
-  const decrypted = decrypt(data.credential_enc as { iv: string; content: string; authTag: string })
-  const accounts = (await fetchMonarchAccounts(decrypted)) ?? []
+  let accounts: Array<{ id: string; name: string }> = []
+  try {
+    const session = deserializeMonarchSession(
+      decrypt(data.credential_enc as { iv: string; content: string; authTag: string })
+    )
+    accounts = (await fetchMonarchAccounts(session)) ?? []
+  } catch {
+    accounts = []
+  }
 
   return Response.json({
     connected: true,
@@ -104,14 +92,13 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(json)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  const credential = normalizeCredential(parsed.data.credential)
   const defaultAccountId = parsed.data.defaultAccountId?.trim() || undefined
-  const validation = await validateMonarchCredential(credential, defaultAccountId)
+  const validation = await validateMonarchSession(parsed.data.credential, defaultAccountId)
   if (!validation.ok) {
     return Response.json({ error: validation.error }, { status: 400 })
   }
 
-  const encrypted = encrypt(credential)
+  const encrypted = encrypt(serializeMonarchSession(validation.session))
 
   const { error } = await supabase.from('monarch_connections').upsert({
     user_id: user.id,
