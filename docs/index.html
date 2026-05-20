@@ -17,6 +17,8 @@
     --foreground:   #22201d;
     --muted:        #777573;
     --border:       #e0e0e0;
+    --neutral-100:  #dcd9d6;
+    --neutral-600:  #363431;
     --positive:     #2daf6f;
     --warning:      #f2c94c;
     --font-body:    'DM Sans', sans-serif;
@@ -163,31 +165,101 @@
   .feature-card p a:hover { border-color: var(--primary); }
 
   /* ── Architecture section ── */
-  .arch-section { background: var(--foreground); color: var(--background); }
-  .arch-section .section-label { color: var(--primary-dim); }
-  .arch-section h2 { color: var(--background); }
-  .arch-section .section-lead { color: #9a9794; }
+  .arch-section {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .arch-section .section-lead { max-width: 580px; margin-bottom: 36px; }
 
-  /* pipeline flow nodes */
-  .fn {
+  .pipeline { display: flex; flex-direction: column; gap: 16px; }
+  .pipeline-lanes {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  @media (min-width: 720px) {
+    .pipeline-lanes {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+  }
+  .pipeline-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--background);
+    box-shadow: var(--shadow);
+  }
+  .pipe-lane-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .lane-stack { display: flex; flex-direction: column; gap: 8px; }
+  .lane-flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pipe-arrow { color: var(--muted); font-size: 15px; flex-shrink: 0; }
+  .pipe-node,
+  .pipe-step {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13.5px;
     font-weight: 500;
     white-space: nowrap;
   }
-  .fn-trigger { background: var(--primary); color: #fff; }
-  .fn-core    { background: #2e2b27; color: #e0ddd8; border: 1px solid #3d3a35; }
-  .fn-ext     { background: var(--positive); color: #fff; }
-  .fn-store   { background: var(--warning); color: var(--foreground); border-radius: 50px; }
-  .fn-arrow   { color: #4a4742; font-size: 16px; padding: 0 4px; flex-shrink: 0; }
-  .fn-label   { font-size: 11px; font-family: var(--font-mono); color: #5a5650; }
-
-  .flow-rows { display: flex; flex-direction: column; gap: 14px; }
-  .flow-row  { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .pipe-node {
+    font-weight: 600;
+    background: var(--primary);
+    color: var(--surface);
+  }
+  .pipe-step {
+    background: var(--surface);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+  }
+  .pipe-step--dim {
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 12.5px;
+    padding: 8px 14px;
+  }
+  .pipeline-review {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--border);
+    background: var(--background);
+  }
+  .pipe-review-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pipe-step--review {
+    background: var(--surface);
+    border-style: dashed;
+    color: var(--foreground);
+  }
+  .pipe-review-note { font-size: 13px; color: var(--muted); }
 
   .arch-links { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
   .arch-link {
@@ -196,13 +268,15 @@
     gap: 6px;
     font-size: 13.5px;
     font-weight: 500;
-    color: var(--primary-dim);
-    border: 1px solid #3d3a35;
+    color: var(--muted);
+    border: 1px solid var(--border);
     border-radius: 100px;
     padding: 8px 18px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
     transition: all 0.15s;
   }
-  .arch-link:hover { border-color: var(--primary); color: var(--primary); background: #2e2b27; }
+  .arch-link:hover { border-color: var(--primary); color: var(--primary); }
 
   /* ── Monarch CTA ── */
   .monarch-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -340,38 +414,37 @@
 <section class="section arch-section">
   <div class="section-inner">
     <div class="section-label">Architecture</div>
-    <h2>One pipeline, triggered daily</h2>
-    <p class="section-lead">A single Vercel function invocation moves data from Gmail to Monarch. No queues, no workers — just a cron and a manual trigger.</p>
+    <h2>From Gmail to Monarch</h2>
+    <p class="section-lead">Moves UPI-tagged transactions from Gmail to Monarch Money. Categorize unknown merchants in Telegram or the web UI — each choice is saved as a permanent mapping. The dashboard shows monthly totals and spending over time.</p>
 
-    <div class="flow-rows">
-      <div class="flow-row">
-        <span class="fn fn-trigger">⏰ Vercel Cron</span>
-        <span class="fn-arrow">+</span>
-        <span class="fn fn-trigger">🖥 Web UI</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-core">Pipeline</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-core">Gmail</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-core">Parser</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-core">Categorizer</span>
+    <div class="pipeline">
+      <div class="pipeline-lanes">
+        <div class="pipeline-lane">
+          <span class="pipe-lane-label">Trigger</span>
+          <div class="lane-stack">
+            <span class="pipe-step pipe-step--dim">Cron</span>
+            <span class="pipe-step pipe-step--dim">Dashboard</span>
+          </div>
+        </div>
+        <div class="pipeline-lane">
+          <span class="pipe-lane-label">Pipeline</span>
+          <div class="lane-flow">
+            <span class="pipe-node">Gmail</span>
+            <span class="pipe-arrow" aria-hidden="true">→</span>
+            <span class="pipe-step">Parse</span>
+            <span class="pipe-arrow" aria-hidden="true">→</span>
+            <span class="pipe-step">Categorize</span>
+          </div>
+        </div>
+        <div class="pipeline-lane">
+          <span class="pipe-lane-label">Outcome</span>
+          <span class="pipe-step">Monarch</span>
+        </div>
       </div>
-      <div class="flow-row">
-        <span class="fn-label">category hit →</span>
-        <span class="fn fn-ext">Monarch Publisher</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-store">Supabase</span>
-      </div>
-      <div class="flow-row">
-        <span class="fn-label">category miss →</span>
-        <span class="fn fn-core">Telegram Bot</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn-label">user picks · saves mapping</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-ext">Monarch Publisher</span>
-        <span class="fn-arrow">→</span>
-        <span class="fn fn-store">Supabase</span>
+      <div class="pipeline-review">
+        <span class="pipe-review-label">When rules don't match</span>
+        <span class="pipe-step pipe-step--review">Telegram or web UI</span>
+        <span class="pipe-review-note">categorize unknown merchants · each choice saves a permanent mapping</span>
       </div>
     </div>
 

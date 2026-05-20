@@ -66,33 +66,28 @@
   .callout strong { color: var(--primary); }
   .callout code { font-family: var(--font-mono); font-size: 12px; background: var(--background); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
 
-  /* ── Pipeline HTML diagram ── */
-  .pn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-weight: 500;
-    white-space: nowrap;
-    text-align: center;
-    line-height: 1.3;
-    font-size: 12.5px;
+  /* ── Pipeline SVG diagram ── */
+  .pipeline-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px 20px;
+    overflow: auto;
+    box-shadow: var(--shadow);
   }
-  .pn-trigger { background: var(--primary); color: #fff; border: 2px solid var(--primary); }
-  .pn-core    { background: var(--foreground); color: var(--background); border: 2px solid var(--primary); }
-  .pn-ext     { background: var(--positive); color: #fff; border: 2px solid var(--positive); }
-  .pn-store   { background: var(--warning); color: var(--foreground); border: 2px solid #e0b800; border-radius: 50px; }
-  .pn-muted   { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
-
-  .pl-row   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
-  .pl-col   { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-  .pl-arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; }
-  .pl-label { font-size: 11px; color: var(--muted); font-family: var(--font-mono); padding: 0 2px; }
-  .pl-vline { width: 2px; background: var(--border); height: 20px; margin: 0 auto; }
-  .pl-group { background: #fafaf9; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; }
-  .pl-group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 14px; }
-  .pl-branch-label { font-size: 11px; font-weight: 600; color: var(--muted); font-family: var(--font-mono); letter-spacing: 0.04em; margin-bottom: 4px; }
+  .pipeline-diagram svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-width: 640px;
+  }
+  .pipeline-diagram text { font-family: var(--font-mono); }
+  .pipeline-diagram-caption {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+  }
+  .pipeline-diagram-caption strong { color: var(--foreground); font-weight: 600; }
 
   /* ── Pipeline steps ── */
   .steps { display: flex; flex-direction: column; gap: 0; }
@@ -183,76 +178,105 @@
 
   <section>
     <h2>Pipeline Data Flow</h2>
-    <div class="pl-group">
-      <div class="pl-group-title">Triggers → Core pipeline → Output</div>
+    <div class="pipeline-diagram">
+      <svg viewBox="0 0 900 780" xmlns="http://www.w3.org/2000/svg" aria-label="UPI Ingestor pipeline data flow">
+        <defs>
+          <marker id="arch-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#777573"/>
+          </marker>
+          <marker id="arch-dash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#ff692d"/>
+          </marker>
+        </defs>
 
-      <div class="pl-row">
-        <span class="pn pn-trigger">⏰ Vercel Cron</span>
-        <span class="pl-arrow">+</span>
-        <span class="pn pn-trigger">🖥 Web UI</span>
-        <span class="pl-arrow">→</span>
-        <span class="pn pn-core">Pipeline</span>
-        <span class="pl-arrow">→</span>
-        <span class="pn pn-core">Gmail API</span>
-      </div>
+        <g font-size="11.5" fill="#22201d">
+          <rect x="336" y="24"  width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="46" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Triggers</text>
+          <text x="450" y="64" text-anchor="middle" fill="#777573" font-size="10">Cron + Web UI → Pipeline</text>
 
-      <div class="pl-vline"></div>
-      <div class="pl-label">raw email bodies</div>
-      <div class="pl-vline"></div>
+          <rect x="336" y="116" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="138" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Gmail API</text>
+          <text x="450" y="156" text-anchor="middle" fill="#777573" font-size="10">raw email bodies</text>
 
-      <div class="pl-row">
-        <span class="pn pn-core">Parser Registry</span>
-        <span class="pl-arrow">→</span>
-        <span class="pn pn-core" style="border-style: dashed;">Dedup check</span>
-        <span class="pl-arrow">→</span>
-        <span class="pn pn-muted">skip if exists</span>
-      </div>
+          <rect x="336" y="208" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="230" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Parser Registry</text>
+          <text x="450" y="248" text-anchor="middle" fill="#777573" font-size="10">HDFC + registry</text>
 
-      <div class="pl-vline"></div>
-      <div class="pl-label">new transaction</div>
-      <div class="pl-vline"></div>
+          <rect x="336" y="300" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="322" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Dedup check</text>
+          <text x="450" y="340" text-anchor="middle" fill="#777573" font-size="10">(user_id, bank_ref_id)</text>
 
-      <div class="pl-row">
-        <span class="pn pn-core">INSERT transaction</span>
-        <span class="pl-arrow">→</span>
-        <span class="pn pn-core">Categorizer</span>
-      </div>
+          <rect x="336" y="392" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="414" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">INSERT transaction</text>
+          <text x="450" y="432" text-anchor="middle" fill="#777573" font-size="10">new row only</text>
 
-      <div class="pl-vline"></div>
+          <rect x="336" y="484" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="506" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Categorizer</text>
+          <text x="450" y="524" text-anchor="middle" fill="#777573" font-size="10">rules → merchant_mappings</text>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
-        <div style="background: #f0fbf5; border: 1px solid #b6e8d0; border-radius: 8px; padding: 14px;">
-          <div class="pl-branch-label" style="color: var(--positive);">→ rules or mapping hit</div>
-          <div class="pl-row" style="margin-top: 8px;">
-            <span class="pn pn-ext">Monarch Publisher</span>
-            <span class="pl-arrow">→</span>
-            <span class="pn pn-store">Supabase</span>
-          </div>
-        </div>
-        <div style="background: #fff7f4; border: 1px solid #ffd5c2; border-radius: 8px; padding: 14px;">
-          <div class="pl-branch-label" style="color: var(--primary);">→ no category match</div>
-          <div class="pl-col" style="margin-top: 8px; gap: 8px;">
-            <div class="pl-row">
-              <span class="pn pn-core">needs_review</span>
-              <span class="pl-arrow">→</span>
-              <span class="pn pn-core">Telegram Bot</span>
-            </div>
-            <div class="pl-label">user picks · saves merchant mapping</div>
-            <div class="pl-row">
-              <span class="pn pn-ext">Monarch Publisher</span>
-              <span class="pl-arrow">→</span>
-              <span class="pn pn-store">Supabase</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <rect x="336" y="576" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="450" y="598" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Monarch Publisher</text>
+          <text x="450" y="616" text-anchor="middle" fill="#777573" font-size="10">GraphQL createTransaction</text>
 
-    <div class="pl-row" style="margin-top: 16px; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted);">
-      <span style="display: flex; align-items: center; gap: 6px;"><span class="pn pn-trigger" style="font-size: 11px; padding: 3px 10px;">■</span> Trigger</span>
-      <span style="display: flex; align-items: center; gap: 6px;"><span class="pn pn-core" style="font-size: 11px; padding: 3px 10px;">■</span> Core pipeline</span>
-      <span style="display: flex; align-items: center; gap: 6px;"><span class="pn pn-ext" style="font-size: 11px; padding: 3px 10px;">■</span> External service</span>
-      <span style="display: flex; align-items: center; gap: 6px;"><span class="pn pn-store" style="font-size: 11px; padding: 3px 10px;">■</span> Data store</span>
+          <rect x="336" y="668" width="228" height="52" rx="9" fill="#22201d" stroke="#22201d"/>
+          <text x="450" y="690" text-anchor="middle" font-weight="600" fill="#f6f5f3" font-family="DM Sans, sans-serif">Supabase</text>
+          <text x="450" y="708" text-anchor="middle" fill="#dcd9d6" font-size="10">postgres · RLS per user</text>
+
+          <rect x="48"  y="300" width="180" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="138" y="322" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif" font-size="11">skip if exists</text>
+          <text x="138" y="340" text-anchor="middle" fill="#777573" font-size="9.5">no insert</text>
+
+          <rect x="672" y="484" width="180" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="762" y="506" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif" font-size="11">needs_review</text>
+          <text x="762" y="524" text-anchor="middle" fill="#777573" font-size="9.5">status flag</text>
+
+          <rect x="672" y="576" width="180" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
+          <text x="762" y="598" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif" font-size="11">Telegram Bot</text>
+          <text x="762" y="616" text-anchor="middle" fill="#777573" font-size="9.5">inline keyboard</text>
+        </g>
+
+        <g stroke="#777573" stroke-width="1.5" fill="none">
+          <path d="M450 76 L450 116" marker-end="url(#arch-solid)"/>
+          <path d="M450 168 L450 208" marker-end="url(#arch-solid)"/>
+          <path d="M450 260 L450 300" marker-end="url(#arch-solid)"/>
+          <path d="M450 352 L450 392" marker-end="url(#arch-solid)"/>
+          <path d="M450 444 L450 484" marker-end="url(#arch-solid)"/>
+          <path d="M450 536 L450 576" marker-end="url(#arch-solid)"/>
+          <path d="M450 628 L450 668" marker-end="url(#arch-solid)"/>
+        </g>
+
+        <g stroke="#ff692d" stroke-width="1.5" fill="none" stroke-dasharray="5 4">
+          <path d="M336 326 L228 326" marker-end="url(#arch-dash)"/>
+          <path d="M564 510 L672 510" marker-end="url(#arch-dash)"/>
+          <path d="M762 536 L762 576" marker-end="url(#arch-dash)"/>
+          <path d="M672 602 L564 602" marker-end="url(#arch-dash)"/>
+        </g>
+
+        <g font-size="11" fill="#777573" font-family="DM Mono, monospace">
+          <text x="318" y="100" text-anchor="end">fetch</text>
+          <text x="318" y="192" text-anchor="end">parse</text>
+          <text x="318" y="284" text-anchor="end">dedup</text>
+          <text x="318" y="376" text-anchor="end">insert</text>
+          <text x="318" y="468" text-anchor="end">categorize</text>
+          <text x="318" y="560" text-anchor="end">publish</text>
+          <text x="318" y="652" text-anchor="end">persist</text>
+        </g>
+
+        <g font-size="10" font-family="DM Mono, monospace">
+          <rect x="248" y="308" width="72" height="16" rx="4" fill="#fff" stroke="#ffd5c2"/>
+          <text x="284" y="320" fill="#ff692d" text-anchor="middle">duplicate</text>
+
+          <rect x="586" y="492" width="66" height="16" rx="4" fill="#fff" stroke="#ffd5c2"/>
+          <text x="619" y="504" fill="#ff692d" text-anchor="middle">no match</text>
+
+          <rect x="778" y="548" width="58" height="16" rx="4" fill="#fff" stroke="#ffd5c2"/>
+          <text x="807" y="560" fill="#ff692d" text-anchor="middle">webhook</text>
+
+          <rect x="592" y="586" width="68" height="16" rx="4" fill="#fff" stroke="#ffd5c2"/>
+          <text x="626" y="598" fill="#ff692d" text-anchor="middle">republish</text>
+        </g>
+      </svg>
+      <p class="pipeline-diagram-caption"><strong>Solid arrows</strong> = synchronous steps in one cron or manual fetch invocation. <strong>Dashed orange</strong> = duplicate skip, human review (needs_review → Telegram webhook), then republish into Monarch.</p>
     </div>
   </section>
 
@@ -270,7 +294,7 @@
         <div class="step-num">2</div>
         <div class="step-body">
           <strong>Gmail fetch — <code>email-sources/gmail.ts</code></strong>
-          <p>Loads the user's encrypted Gmail OAuth refresh token from <code>gmail_connections</code>, decrypts it, and calls the Gmail API to list messages matching the <code>GMAIL_FETCH_LABEL</code> (default: <code>UPI</code>) received within the last <code>GMAIL_FETCH_DAYS_BACK</code> days.</p>
+          <p>Loads the user's encrypted Gmail OAuth refresh token from <code>gmail_connections</code>, decrypts it, and calls the Gmail API to list messages matching <code>GMAIL_FETCH_LABEL</code> (default: <code>UPI</code>). The earliest date comes from per-user <code>fetch_since_date</code> in Settings, or <code>GMAIL_FETCH_DAYS_BACK</code> when unset.</p>
         </div>
       </div>
       <div class="step">
