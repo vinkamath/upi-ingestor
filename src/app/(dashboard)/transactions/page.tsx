@@ -41,6 +41,7 @@ type MonarchCategoryOption = {
 type StatusMessage = {
   text: string
   monarchHref?: string
+  variant?: 'info' | 'error'
 }
 
 function txDateYmd(tx: Tx) {
@@ -144,11 +145,21 @@ export default function TransactionsPage() {
     setStatusMessage({ text: 'Fetching latest Gmail transactions…' })
     const res = await fetch('/api/gmail/fetch-now', { method: 'POST' })
     if (!res.ok) {
-      setStatusMessage({ text: 'Fetch failed. Check server logs and try again.' })
+      setStatusMessage({
+        text: 'Fetch failed. Check server logs and try again.',
+        variant: 'error',
+      })
       return
     }
     const json = await res.json()
     const summary = json?.summary
+    if (summary?.gmailError) {
+      setStatusMessage({
+        text: summary.gmailError.message,
+        variant: 'error',
+      })
+      return
+    }
     const count = await load()
     if (summary) {
       setStatusMessage({
@@ -454,8 +465,20 @@ export default function TransactionsPage() {
 
       {/* Status message */}
       {statusMessage && (
-        <div className="flex items-start gap-2 rounded-lg bg-card border border-border px-4 py-2.5 text-[13px] text-foreground">
-          <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+        <div
+          className={cn(
+            'flex items-start gap-2 rounded-lg border px-4 py-2.5 text-[13px]',
+            statusMessage.variant === 'error'
+              ? 'bg-destructive/5 border-destructive/30 text-destructive'
+              : 'bg-card border-border text-foreground'
+          )}
+        >
+          <AlertCircle
+            className={cn(
+              'h-3.5 w-3.5 shrink-0 mt-0.5',
+              statusMessage.variant === 'error' ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          />
           <span>
             {statusMessage.text}
             {statusMessage.monarchHref && (

@@ -21,6 +21,11 @@ export async function processUserTransactions(userId: string) {
     parseErrors: fetched.debug.parseErrors,
     query: fetched.debug.query,
     sampleSubjects: fetched.debug.sampleSubjects,
+    gmailError: fetched.error ?? null,
+  }
+
+  if (fetched.error) {
+    return summary
   }
 
   if (summary.parseErrors.length > 0) {

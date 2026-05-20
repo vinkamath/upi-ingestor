@@ -46,8 +46,15 @@ function extractTextPlainBody(part?: gmail_v1.Schema$MessagePart): string | null
   return null
 }
 
+export type GmailFetchError = {
+  code: 'not_connected' | 'invalid_grant' | 'fetch_failed'
+  message: string
+  needsReconnect: boolean
+}
+
 export type GmailFetchResult = {
   transactions: ParsedTransaction[]
+  error?: GmailFetchError
   debug: {
     query: string
     matchedMessages: number
@@ -64,6 +71,32 @@ export type GmailFetchResult = {
   }
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: { message?: string } }).cause
+    if (cause?.message) return cause.message
+    return error.message
+  }
+  return String(error)
+}
+
+function toGmailFetchError(error: unknown): GmailFetchError {
+  const raw = getErrorMessage(error)
+  const needsReconnect = raw.includes('invalid_grant')
+  if (needsReconnect) {
+    return {
+      code: 'invalid_grant',
+      message: 'Gmail access expired or was revoked. Reconnect in Settings → Gmail.',
+      needsReconnect: true,
+    }
+  }
+  return {
+    code: 'fetch_failed',
+    message: `Gmail fetch failed: ${raw}`,
+    needsReconnect: false,
+  }
+}
+
 export async function fetchGmailTransactions(userId: string): Promise<GmailFetchResult> {
   const supabase = createAdminClient()
   const { data: connection, error } = await supabase
@@ -75,6 +108,11 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   if (error || !connection) {
     return {
       transactions: [],
+      error: {
+        code: 'not_connected',
+        message: 'Gmail is not connected. Connect in Settings → Gmail.',
+        needsReconnect: false,
+      },
       debug: {
         query: '',
         matchedMessages: 0,
@@ -161,9 +199,11 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
       },
     }
   } catch (error) {
-    console.error('gmail.fetch_failed', { userId, error })
+    const fetchError = toGmailFetchError(error)
+    console.error('gmail.fetch_failed', { userId, code: fetchError.code, error })
     return {
       transactions: [],
+      error: fetchError,
       debug: {
         query: 'error',
         matchedMessages: 0,
