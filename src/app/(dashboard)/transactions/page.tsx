@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Trash2, Upload, CheckSquare, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CategoryCombobox } from '@/components/category-combobox'
 import { cn } from '@/lib/utils'
 import { buildMonarchTransactionsUrl, toTransactionYmd } from '@/lib/monarch-url'
 import { partitionMonarchCategoriesForPicker } from '@/lib/monarch-categories'
@@ -70,8 +71,50 @@ const STATUS_CONFIG: Record<
   },
 }
 
-const chevronSmallSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23777573' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
-const chevronSmallStyle = { backgroundImage: chevronSmallSvg, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }
+type CategoryPickerGroups = {
+  pinned: MonarchCategoryOption[]
+  rest: MonarchCategoryOption[]
+}
+
+type TransactionCategoryFieldProps = {
+  txId: string
+  value: string
+  onCategoryChange: (txId: string, next: string) => void
+  categoryGroups: CategoryPickerGroups
+  hasCategories: boolean
+  disabled: boolean
+}
+
+function TransactionCategoryField({
+  value,
+  onCategoryChange,
+  txId,
+  categoryGroups,
+  hasCategories,
+  disabled,
+}: TransactionCategoryFieldProps) {
+  if (hasCategories) {
+    const { pinned, rest } = categoryGroups
+    return (
+      <CategoryCombobox
+        value={value}
+        onChange={(next) => onCategoryChange(txId, next)}
+        pinned={pinned}
+        rest={rest}
+        disabled={disabled}
+      />
+    )
+  }
+  return (
+    <input
+      className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 focus:outline-none focus:ring-2 focus:ring-ring"
+      placeholder="Category"
+      value={value}
+      onChange={(e) => onCategoryChange(txId, e.target.value)}
+      disabled={disabled}
+    />
+  )
+}
 
 export default function TransactionsPage() {
   const [txs, setTxs] = useState<Tx[]>([])
@@ -329,45 +372,11 @@ export default function TransactionsPage() {
     () => partitionMonarchCategoriesForPicker(categories, pinnedCategoryNames),
     [categories, pinnedCategoryNames]
   )
+  const hasCategories = categories.length > 0
 
-  function CategoryField({ txId, category }: { txId: string; category: string | null }) {
-    const hasCategories = categories.length > 0
-    if (hasCategories) {
-      const { pinned, rest } = categoryGroups
-      return (
-        <select
-          className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
-          style={chevronSmallStyle}
-          value={categoryDrafts[txId] ?? category ?? ''}
-          onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [txId]: e.target.value }))}
-        >
-          <option value="" disabled>Select category</option>
-          {pinned.length > 0 && (
-            <optgroup label="Quick categories">
-              {pinned.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </optgroup>
-          )}
-          {rest.length > 0 && (
-            <optgroup label={pinned.length > 0 ? 'All categories' : 'Categories'}>
-              {rest.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-      )
-    }
-    return (
-      <input
-        className="h-7 w-full rounded-lg border border-border bg-background text-[12px] text-foreground px-2 focus:outline-none focus:ring-2 focus:ring-ring"
-        placeholder="Category"
-        value={categoryDrafts[txId] ?? category ?? ''}
-        onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [txId]: e.target.value }))}
-      />
-    )
-  }
+  const handleCategoryChange = useCallback((txId: string, next: string) => {
+    setCategoryDrafts((prev) => ({ ...prev, [txId]: next }))
+  }, [])
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-w-6xl mx-auto">
@@ -574,7 +583,14 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <CategoryField txId={tx.id} category={tx.category} />
+                  <TransactionCategoryField
+                    txId={tx.id}
+                    value={categoryDrafts[tx.id] ?? tx.category ?? ''}
+                    onCategoryChange={handleCategoryChange}
+                    categoryGroups={categoryGroups}
+                    hasCategories={hasCategories}
+                    disabled={isBusy}
+                  />
                 </TableCell>
                 <TableCell>
                   {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
@@ -672,7 +688,14 @@ export default function TransactionsPage() {
             {/* Bottom row: category + status badge + delete */}
             <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0">
-                <CategoryField txId={tx.id} category={tx.category} />
+                <TransactionCategoryField
+                  txId={tx.id}
+                  value={categoryDrafts[tx.id] ?? tx.category ?? ''}
+                  onCategoryChange={handleCategoryChange}
+                  categoryGroups={categoryGroups}
+                  hasCategories={hasCategories}
+                  disabled={isBusy}
+                />
               </div>
               {tx.status === 'failed' && tx.raw_payload?.publish_error ? (
                 <Badge
