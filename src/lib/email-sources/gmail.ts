@@ -3,27 +3,12 @@ import type { ParsedTransaction } from '@/lib/types/domain'
 import { parseUpiEmail } from '@/lib/parsers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { decrypt } from '@/lib/crypto/encryption'
-
-function getIstMidnightCutoffEpochSeconds(daysBack: number) {
-  const now = new Date()
-  const istOffsetMinutes = 330
-  const utcMillis = now.getTime() + now.getTimezoneOffset() * 60_000
-  const istNow = new Date(utcMillis + istOffsetMinutes * 60_000)
-
-  const istMidnightMillis = Date.UTC(
-    istNow.getUTCFullYear(),
-    istNow.getUTCMonth(),
-    istNow.getUTCDate(),
-    0,
-    0,
-    0,
-    0
-  )
-
-  const cutoffIstMillis = istMidnightMillis - daysBack * 24 * 60 * 60 * 1000
-  const cutoffUtcMillis = cutoffIstMillis - istOffsetMinutes * 60_000
-  return Math.floor(cutoffUtcMillis / 1000)
-}
+import {
+  getDefaultFetchDaysBack,
+  getDefaultFetchMaxResults,
+  getIstMidnightCutoffEpochSeconds,
+  getIstMidnightEpochSecondsForYmd,
+} from '@/lib/email-sources/gmail-cutoff'
 
 function getOauthClient(refreshToken: string) {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
@@ -37,14 +22,6 @@ function getOauthClient(refreshToken: string) {
   )
   client.setCredentials({ refresh_token: refreshToken })
   return client
-}
-
-function getPositiveIntEnv(name: string, fallback: number) {
-  const value = process.env[name]
-  if (!value) return fallback
-  const parsed = Number.parseInt(value, 10)
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
-  return parsed
 }
 
 function decodeGmailBase64(input: string) {
@@ -91,7 +68,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   const supabase = createAdminClient()
   const { data: connection, error } = await supabase
     .from('gmail_connections')
-    .select('refresh_token_enc,last_history_id,email_address')
+    .select('refresh_token_enc,last_history_id,email_address,fetch_since_date')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -114,10 +91,13 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
     const refreshToken = decrypt(connection.refresh_token_enc as { iv: string; content: string; authTag: string })
     const auth = getOauthClient(refreshToken)
     const gmail = google.gmail({ version: 'v1', auth })
-    const daysBack = getPositiveIntEnv('GMAIL_FETCH_DAYS_BACK', 3)
-    const maxResults = getPositiveIntEnv('GMAIL_FETCH_MAX_RESULTS', 25)
+    const maxResults = getDefaultFetchMaxResults()
     const labelName = process.env.GMAIL_FETCH_LABEL?.trim() || 'UPI'
-    const query = `label:${labelName} after:${getIstMidnightCutoffEpochSeconds(daysBack)}`
+    const fetchSinceDate = connection.fetch_since_date as string | null
+    const afterEpoch = fetchSinceDate
+      ? getIstMidnightEpochSecondsForYmd(fetchSinceDate)
+      : getIstMidnightCutoffEpochSeconds(getDefaultFetchDaysBack())
+    const query = `label:${labelName} after:${afterEpoch}`
 
     const list = await gmail.users.messages.list({
       userId: 'me',
