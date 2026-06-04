@@ -14,6 +14,9 @@ export const DEFAULT_PINNED_CATEGORY_NAMES = [
   'Travel',
 ] as const
 
+/** Categories whose merchants should not be remembered for auto-mapping. */
+export const DEFAULT_NO_REMEMBER_TAGS = ['Auto Rikshaw'] as const
+
 export type MonarchCategoryPickerGroups = {
   pinned: MonarchCategoryOption[]
   rest: MonarchCategoryOption[]
