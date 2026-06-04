@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { DEFAULT_PINNED_CATEGORY_NAMES } from '@/lib/monarch-categories'
+import { DEFAULT_PINNED_CATEGORY_NAMES, DEFAULT_NO_REMEMBER_TAGS } from '@/lib/monarch-categories'
 
 type MonarchCategoryOption = { id: string; name: string }
 
@@ -86,6 +86,10 @@ export default function SettingsPage() {
   const [addCategoryName, setAddCategoryName] = useState('')
   const [isSavingPinned, setIsSavingPinned] = useState(false)
   const [pinnedMessage, setPinnedMessage] = useState<string | null>(null)
+  const [noRememberTags, setNoRememberTags] = useState<string[]>([])
+  const [addNoRememberTag, setAddNoRememberTag] = useState('')
+  const [isSavingNoRemember, setIsSavingNoRemember] = useState(false)
+  const [noRememberMessage, setNoRememberMessage] = useState<string | null>(null)
 
   async function loadGmailStatus() {
     const res = await fetch('/api/connect/gmail/status')
@@ -245,6 +249,10 @@ export default function SettingsPage() {
     if (Array.isArray(names)) {
       setPinnedCategoryNames(names.filter((n: unknown) => typeof n === 'string'))
     }
+    const tags = json?.noRememberTags
+    if (Array.isArray(tags)) {
+      setNoRememberTags(tags.filter((n: unknown) => typeof n === 'string'))
+    }
   }
 
   async function savePinnedCategories() {
@@ -294,9 +302,52 @@ export default function SettingsPage() {
     setPinnedCategoryNames([...DEFAULT_PINNED_CATEGORY_NAMES])
   }
 
+  async function saveNoRememberTags() {
+    setNoRememberMessage(null)
+    setIsSavingNoRemember(true)
+    const res = await fetch('/api/settings/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ noRememberTags }),
+    })
+    const json = await res.json()
+    setIsSavingNoRemember(false)
+    if (!res.ok) {
+      setNoRememberMessage(`Failed to save: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setNoRememberMessage('No-remember tags saved.')
+  }
+
+  function addNoRememberTagItem(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const exists = noRememberTags.some(
+      (n) => n.localeCompare(trimmed, undefined, { sensitivity: 'accent' }) === 0
+    )
+    if (exists) return
+    setNoRememberTags((prev) => [...prev, trimmed])
+    setAddNoRememberTag('')
+  }
+
+  function removeNoRememberTag(index: number) {
+    setNoRememberTags((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function resetNoRememberToDefaults() {
+    setNoRememberTags([...DEFAULT_NO_REMEMBER_TAGS])
+  }
+
   const availableToPin = monarchCategories.filter(
     (c) =>
       !pinnedCategoryNames.some(
+        (n) => n.localeCompare(c.name, undefined, { sensitivity: 'accent' }) === 0
+      )
+  )
+
+  const availableToTag = monarchCategories.filter(
+    (c) =>
+      !noRememberTags.some(
         (n) => n.localeCompare(c.name, undefined, { sensitivity: 'accent' }) === 0
       )
   )
@@ -604,6 +655,108 @@ export default function SettingsPage() {
           </div>
           {pinnedMessage && (
             <p className="text-[12px] text-muted-foreground">{pinnedMessage}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* No-remember merchant tags */}
+      <Card className="shadow-sm border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-[15px]">No-remember merchant tags</CardTitle>
+              <CardDescription className="text-[12px]">
+                Merchants in these categories won&apos;t be auto-mapped for future transactions.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {monarchCategories.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              Connect Monarch Money to load categories.
+            </p>
+          ) : (
+            <>
+              {noRememberTags.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {noRememberTags.map((name, index) => (
+                    <li
+                      key={`${name}-${index}`}
+                      className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2 py-1.5"
+                    >
+                      <span className="flex-1 text-[13px] text-foreground truncate">{name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeNoRememberTag(index)}
+                        aria-label={`Remove ${name}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">No tags selected.</p>
+              )}
+
+              {availableToTag.length > 0 && (
+                <div className="flex gap-2">
+                  <select
+                    className={cn(styledSelect, 'flex-1')}
+                    style={selectStyle}
+                    value={addNoRememberTag}
+                    onChange={(e) => setAddNoRememberTag(e.target.value)}
+                  >
+                    <option value="">Add category…</option>
+                    {availableToTag.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={!addNoRememberTag}
+                    onClick={() => addNoRememberTagItem(addNoRememberTag)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={saveNoRememberTags}
+              disabled={isSavingNoRemember}
+              size="sm"
+              className="flex-1 min-w-[120px]"
+            >
+              {isSavingNoRemember ? 'Saving…' : 'Save tags'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetNoRememberToDefaults}
+              disabled={isSavingNoRemember}
+            >
+              Reset defaults
+            </Button>
+          </div>
+          {noRememberMessage && (
+            <p className="text-[12px] text-muted-foreground">{noRememberMessage}</p>
           )}
         </CardContent>
       </Card>

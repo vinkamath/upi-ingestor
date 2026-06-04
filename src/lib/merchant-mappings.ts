@@ -12,6 +12,18 @@ export async function learnMerchantMapping(args: {
   const merchantKey = normalizeMerchant(args.merchantRaw)
   if (!merchantKey) return { ok: false as const, reason: 'empty_merchant_key' as const }
 
+  const { data: prefs } = await args.supabase
+    .from('user_preferences')
+    .select('no_remember_tags')
+    .eq('user_id', args.userId)
+    .maybeSingle()
+
+  const noRememberTags: string[] = prefs?.no_remember_tags ?? []
+  const isNoRemember = noRememberTags.some(
+    (tag) => tag.localeCompare(args.category, undefined, { sensitivity: 'accent' }) === 0
+  )
+  if (isNoRemember) return { ok: true as const, merchantKey, skipped: true as const }
+
   const nowIso = new Date().toISOString()
 
   const { error: upsertError } = await args.supabase.from('merchant_mappings').upsert(
@@ -33,4 +45,3 @@ export async function learnMerchantMapping(args: {
 
   return { ok: true as const, merchantKey }
 }
-
