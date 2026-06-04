@@ -450,28 +450,30 @@ export default function TransactionsPage() {
           })}
         </div>
 
-        {/* Bulk actions — horizontally scrollable on mobile */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={saveSelectedCategories}
-            disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px] shrink-0"
-          >
-            <CheckSquare className="h-3.5 w-3.5" />
-            {savingCategoryId === '__bulk__' ? 'Saving…' : `Save (${selectedCount})`}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={deleteSelectedTransactions}
-            disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px] shrink-0 text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {deletingId === '__bulk__' ? 'Deleting…' : `Delete (${selectedCount})`}
-          </Button>
+        {/* Bulk actions — Save/Delete scroll on mobile; Publish menu must sit outside overflow-x-auto */}
+        <div className="flex items-center gap-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0">
+          <div className="flex items-center gap-2 overflow-x-auto md:overflow-visible md:flex-wrap flex-1 min-w-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveSelectedCategories}
+              disabled={isBusy || selectedCount === 0}
+              className="gap-1.5 text-[13px] shrink-0"
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {savingCategoryId === '__bulk__' ? 'Saving…' : `Save (${selectedCount})`}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={deleteSelectedTransactions}
+              disabled={isBusy || selectedCount === 0}
+              className="gap-1.5 text-[13px] shrink-0 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deletingId === '__bulk__' ? 'Deleting…' : `Delete (${selectedCount})`}
+            </Button>
+          </div>
           <div ref={publishSplitRef} className="relative flex shrink-0">
             <Button
               variant="default"
@@ -494,13 +496,14 @@ export default function TransactionsPage() {
               <ChevronDown className="h-3.5 w-3.5" />
             </Button>
             {publishDropdownOpen && (
-              <div className="absolute top-full right-0 mt-1 z-20 min-w-[160px] rounded-lg border border-border bg-card shadow-md overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 z-20 w-full rounded-lg border border-border bg-card shadow-md overflow-hidden">
                 <button
+                  type="button"
                   onClick={() => { void publishSelectedTransactions(); setPublishDropdownOpen(false) }}
                   disabled={isBusy || selectedCount === 0}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-9 w-full items-center gap-1.5 px-3 text-[13px] font-medium text-foreground hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                 >
-                  <Upload className="h-3.5 w-3.5" />
+                  <Upload className="h-3.5 w-3.5 shrink-0" />
                   {`Publish (${selectedCount})`}
                 </button>
               </div>
