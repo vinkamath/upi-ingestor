@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Trash2, Upload, CheckSquare, AlertCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RefreshCw, Trash2, Upload, CheckSquare, AlertCircle, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -123,7 +123,7 @@ export default function TransactionsPage() {
   const [usdPerInr, setUsdPerInr] = useState<number | null>(null)
   const [rateDate, setRateDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('needs_review')
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [publishingAll, setPublishingAll] = useState(false)
@@ -131,6 +131,8 @@ export default function TransactionsPage() {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null)
   const [defaultAccountId, setDefaultAccountId] = useState<string | null>(null)
   const [pinnedCategoryNames, setPinnedCategoryNames] = useState<string[]>([])
+  const [publishDropdownOpen, setPublishDropdownOpen] = useState(false)
+  const publishSplitRef = useRef<HTMLDivElement>(null)
 
   async function load() {
     setIsLoading(true)
@@ -354,6 +356,17 @@ export default function TransactionsPage() {
   }
 
   useEffect(() => {
+    if (!publishDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (publishSplitRef.current && !publishSplitRef.current.contains(e.target as Node)) {
+        setPublishDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [publishDropdownOpen])
+
+  useEffect(() => {
     const id = window.setTimeout(() => {
       void load()
       void loadCategories()
@@ -459,26 +472,40 @@ export default function TransactionsPage() {
             <Trash2 className="h-3.5 w-3.5" />
             {deletingId === '__bulk__' ? 'Deleting…' : `Delete (${selectedCount})`}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={publishSelectedTransactions}
-            disabled={isBusy || selectedCount === 0}
-            className="gap-1.5 text-[13px] shrink-0"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            {publishingAll ? 'Publishing…' : `Publish (${selectedCount})`}
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={publishAllVisible}
-            disabled={isBusy}
-            className="gap-1.5 text-[13px] shrink-0"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            {publishingAll ? 'Publishing…' : 'Publish all'}
-          </Button>
+          <div ref={publishSplitRef} className="relative flex shrink-0">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={publishAllVisible}
+              disabled={isBusy}
+              className="gap-1.5 text-[13px] rounded-r-none pr-2.5"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {publishingAll ? 'Publishing…' : 'Publish all'}
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setPublishDropdownOpen((v) => !v)}
+              disabled={isBusy}
+              className="px-1.5 rounded-l-none border-l border-primary-foreground/20"
+              aria-label="More publish options"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+            {publishDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 z-20 min-w-[160px] rounded-lg border border-border bg-card shadow-md overflow-hidden">
+                <button
+                  onClick={() => { void publishSelectedTransactions(); setPublishDropdownOpen(false) }}
+                  disabled={isBusy || selectedCount === 0}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {`Publish (${selectedCount})`}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
