@@ -485,15 +485,18 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="monarch-token" className="text-[12px]">Token / Credential</Label>
-            <Input
-              id="monarch-token"
-              type="password"
-              placeholder="••••••••"
-              className="h-8 text-[13px]"
+            <Label htmlFor="monarch-session" className="text-[12px]">Session cookies</Label>
+            <textarea
+              id="monarch-session"
+              placeholder="sessionid=…; csrftoken=…"
+              className="min-h-[72px] w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[12px] font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               value={monarch.credential}
               onChange={(e) => setMonarch((s) => ({ ...s, credential: e.target.value }))}
             />
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Log in at app.monarch.com, open DevTools → Network, pick any api.monarch.com request,
+              and copy the cookie header (needs sessionid and csrftoken).
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="monarch-account" className="text-[12px]">Default Account</Label>

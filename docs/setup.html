@@ -297,82 +297,41 @@ https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
           <strong>Don't have Monarch yet?</strong> <a href="https://monarch.com/referral/2zjygvbrc9">Try it free →</a> — budgets, net worth, investments, and your UPI transactions all in one place.
         </div>
         <p style="font-size: 14px; margin-bottom: 16px;">
-          UPI Ingestor talks to Monarch’s GraphQL API with an <strong>API token</strong> (<code>Authorization: Token …</code>), not browser cookies.
-          The Monarch website signs you in with cookies; you obtain a separate token via the login API below and paste it into the dashboard.
+          UPI Ingestor talks to Monarch’s GraphQL API with a <strong>browser session</strong> — <code>sessionid</code> and <code>csrftoken</code> cookies plus CSRF headers.
+          The old <code>Authorization: Token …</code> header no longer works.
         </p>
         <ol class="step-list">
           <li><code>MONARCH_GRAPHQL_URL</code> is pre-configured to <code>https://api.monarch.com/graphql</code> — no change needed.</li>
           <li>
-            <strong>Get an API token</strong> (requires <code>curl</code> and <code>jq</code>). Export your Monarch email and password, and a device UUID:
-            <pre>export MONARCH_EMAIL='you@example.com'
-export MONARCH_PASSWORD='your-password'
-export DEVICE_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
-
-export HDR=(
-  -H 'Content-Type: application/json'
-  -H 'Accept: application/json'
-  -H 'Client-Platform: web'
-  -H "device-uuid: ${DEVICE_UUID}"
-  -H 'Origin: https://app.monarch.com'
-  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-)</pre>
-            <strong>Step A — password only</strong> (expect MFA if enabled):
-            <pre>curl -s -w '\nHTTP %{http_code}\n' 'https://api.monarch.com/auth/login/' \
-  "${HDR[@]}" \
-  -d "$(jq -n \
-    --arg u "$MONARCH_EMAIL" \
-    --arg p "$MONARCH_PASSWORD" \
-    '{username:$u,password:$p,supports_mfa:true,supports_email_otp:true,supports_recaptcha:true,trusted_device:true}')"</pre>
-            A response with <code>"error_code":"MFA_REQUIRED"</code> and HTTP <strong>403</strong> is normal when MFA is on — continue to Step B.
-            <strong>Step B — password + MFA code</strong> (use a fresh 6-digit code from your authenticator, or an email code if Monarch emails you one).
-            <p style="font-size: 13px; margin: 10px 0 6px;"><strong>Bash</strong> (prompt with <code>read -p</code>):</p>
-            <pre>read -r -p '6-digit code from authenticator: ' MFA_CODE
-
-curl -s -w '\nHTTP %{http_code}\n' 'https://api.monarch.com/auth/login/' \
-  "${HDR[@]}" \
-  -d "$(jq -n \
-    --arg u "$MONARCH_EMAIL" \
-    --arg p "$MONARCH_PASSWORD" \
-    --arg c "$MFA_CODE" \
-    '{username:$u,password:$p,totp:$c,supports_mfa:true,supports_email_otp:true,supports_recaptcha:true,trusted_device:true}')"</pre>
-            <p style="font-size: 13px; margin: 10px 0 6px;"><strong>zsh</strong> (use <code>read "?…"</code> — <code>read -p</code> is not supported):</p>
-            <pre>read "?6-digit code from authenticator: " MFA_CODE
-
-curl -s -w '\nHTTP %{http_code}\n' 'https://api.monarch.com/auth/login/' \
-  "${HDR[@]}" \
-  -d "$(jq -n \
-    --arg u "$MONARCH_EMAIL" \
-    --arg p "$MONARCH_PASSWORD" \
-    --arg c "$MFA_CODE" \
-    '{username:$u,password:$p,totp:$c,supports_mfa:true,supports_email_otp:true,supports_recaptcha:true,trusted_device:true}')"</pre>
-            Or set the code directly in either shell: <code>MFA_CODE=123456</code> (replace with the current code), then run only the <code>curl</code> block.
-            <p style="font-size: 13px; margin: 10px 0 6px;">If Monarch sends an <strong>email</strong> code instead of an authenticator code, use <code>email_otp</code> in the JSON (same <code>MFA_CODE</code> variable):</p>
-            <pre>curl -s -w '\nHTTP %{http_code}\n' 'https://api.monarch.com/auth/login/' \
-  "${HDR[@]}" \
-  -d "$(jq -n \
-    --arg u "$MONARCH_EMAIL" \
-    --arg p "$MONARCH_PASSWORD" \
-    --arg c "$MFA_CODE" \
-    '{username:$u,password:$p,email_otp:$c,supports_mfa:true,supports_email_otp:true,supports_recaptcha:true,trusted_device:true}')"</pre>
-            On success you get HTTP <strong>200</strong> and JSON with <code>"token": "…"</code>. Prefer <code>"tokenExpiration": null</code> (long-lived). Copy only the <code>token</code> value — not <code>csrftoken</code> or <code>sessionid</code> from browser DevTools.
-            <strong>Verify the token</strong> before saving it in the app:
-            <pre>export MONARCH_TOKEN='paste-token-here'
+            <strong>Get session cookies from your browser</strong> (recommended):
+            <ol style="margin-top: 8px;">
+              <li>Log in at <a href="https://app.monarch.com">app.monarch.com</a> (use “trust this device” if prompted — sessions last weeks to months).</li>
+              <li>Open DevTools → <strong>Network</strong>, reload the page, and click any request to <code>api.monarch.com</code>.</li>
+              <li>Under <strong>Request Headers</strong>, copy the full <code>cookie:</code> value. It must include <code>sessionid</code> and <code>csrftoken</code>.</li>
+            </ol>
+            <strong>Verify the session</strong> before saving (replace the cookie values):
+            <pre>export MONARCH_COOKIES='sessionid=…; csrftoken=…'
+export MONARCH_CSRF='paste-csrftoken-value-here'
 
 curl -s 'https://api.monarch.com/graphql' \
   -H 'Content-Type: application/json' \
-  "${HDR[@]}" \
-  -H "Authorization: Token ${MONARCH_TOKEN}" \
+  -H "Cookie: ${MONARCH_COOKIES}" \
+  -H "X-Csrftoken: ${MONARCH_CSRF}" \
+  -H 'Origin: https://app.monarch.com' \
+  -H 'Referer: https://app.monarch.com/' \
+  -H 'monarch-client: web' \
+  -H 'monarch-client-version: 2025.05' \
   -d '{"query":"query { accounts { id displayName } }"}'</pre>
           </li>
           <li>
-            In the app dashboard, go to <strong>Settings → Monarch</strong>. Enter your Monarch <strong>email</strong> and the <strong>Token / Credential</strong> from the step above.
-            The app encrypts the token with your <code>ENCRYPTION_KEY</code> and stores ciphertext in Supabase — the plaintext token is never logged.
+            In the app dashboard, go to <strong>Settings → Monarch</strong>. Enter your Monarch <strong>email</strong> and paste the <strong>session cookies</strong> from the step above.
+            The app encrypts the session with your <code>ENCRYPTION_KEY</code> and stores ciphertext in Supabase — plaintext cookies are never logged.
           </li>
           <li>After connecting, use <strong>Save Monarch connection</strong>, then <strong>Fetch Categories</strong> to load Monarch categories for Telegram prompts.</li>
           <li>Optionally set a default Monarch account ID so transactions are attributed to the right account.</li>
         </ol>
         <div class="callout callout-warn">
-          <strong>Note:</strong> Monarch’s GraphQL API is unofficial. The publisher uses a minimal surface (<code>createTransaction</code> mutation). Tokens can expire or be revoked — repeat the login steps to obtain a new token. If login fails with 403/404, try without a VPN. See <code>src/lib/publishers/monarch/</code> if the schema changes.
+          <strong>Note:</strong> Monarch’s GraphQL API is unofficial. The publisher uses a minimal surface (<code>createTransaction</code> mutation). Sessions can expire or be revoked — log in again and paste fresh cookies. If you previously connected with an API token, reconnect with session cookies. See <code>src/lib/publishers/monarch/</code> if the schema changes.
         </div>
       </div>
     </div>
@@ -411,7 +370,7 @@ npx vercel --prod   # production</pre>
       <li>Sign in at <code>/login</code> — you should land on the Transactions dashboard</li>
       <li>Connect Gmail: <strong>Settings → Gmail</strong> → authorize via Google OAuth → status shows "Connected"</li>
       <li>Connect Telegram: generate a link code → send it to your bot → "Linked" status appears</li>
-      <li>Connect Monarch: obtain API token (see section 4) → enter email + token in Settings → fetch categories → category list populates</li>
+      <li>Connect Monarch: obtain session cookies (see section 4) → enter email + cookies in Settings → fetch categories → category list populates</li>
           <li>Click <strong>Fetch Now</strong> — pipeline runs, summary shows fetched/parsed/inserted counts</li>
           <li>Test cron locally (optional): with <code>npm run dev</code> running, call <code>GET /api/cron/poll</code> with <code>Authorization: Bearer $CRON_SECRET</code>. Expect <code>totalUsers</code> ≥ 1 after Gmail is connected.</li>
       <li>If any transaction shows <code>needs_review</code>, check Telegram — inline keyboard should have arrived</li>
