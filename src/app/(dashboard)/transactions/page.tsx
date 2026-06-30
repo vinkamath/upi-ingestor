@@ -122,6 +122,7 @@ export default function TransactionsPage() {
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({})
   const [usdPerInr, setUsdPerInr] = useState<number | null>(null)
   const [rateDate, setRateDate] = useState<string | null>(null)
+  const [lastPulledAt, setLastPulledAt] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('needs_review')
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
@@ -204,6 +205,7 @@ export default function TransactionsPage() {
       return
     }
     const count = await load()
+    setLastPulledAt(new Date().toISOString())
     if (summary) {
       setStatusMessage({
         text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${count} total`,
@@ -401,6 +403,17 @@ export default function TransactionsPage() {
             {usdToInr
               ? `1 USD = ${usdToInr.toFixed(2)} INR${rateDate ? ` · ${rateDate}` : ''}`
               : 'FX rate unavailable'}
+          </p>
+          <p className="text-[12px] md:text-[13px] text-muted-foreground mt-0.5">
+            {lastPulledAt
+              ? `Last pulled: ${new Date(lastPulledAt).toLocaleString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`
+              : 'Last pulled: —'}
           </p>
         </div>
         <Button

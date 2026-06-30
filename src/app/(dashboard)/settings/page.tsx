@@ -53,11 +53,14 @@ export default function SettingsPage() {
   const [gmailStatus, setGmailStatus] = useState<{
     connected: boolean
     emailAddress: string | null
+    authType: 'app_password' | 'oauth'
     lastUpdatedAt: string | null
     fetchSinceDate: string | null
     defaultFetchDaysBack: number
     fetchMaxResults: number
   } | null>(null)
+  const [gmailConnection, setGmailConnection] = useState({ emailAddress: '', appPassword: '' })
+  const [isSavingGmailConnection, setIsSavingGmailConnection] = useState(false)
   const [gmailFetchSinceDate, setGmailFetchSinceDate] = useState('')
   const [isSavingGmailFetch, setIsSavingGmailFetch] = useState(false)
   const [gmailFetchMessage, setGmailFetchMessage] = useState<string | null>(null)
@@ -100,6 +103,40 @@ export default function SettingsPage() {
     }
     setGmailStatus(json)
     setGmailFetchSinceDate(json.fetchSinceDate ?? '')
+    setGmailConnection((current) => ({
+      ...current,
+      emailAddress: json.emailAddress ?? current.emailAddress,
+    }))
+  }
+
+  async function saveGmailConnection() {
+    setGmailFetchMessage(null)
+    setIsSavingGmailConnection(true)
+    const res = await fetch('/api/connect/gmail/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        emailAddress: gmailConnection.emailAddress,
+        appPassword: gmailConnection.appPassword,
+        fetchSinceDate: gmailFetchSinceDate.trim() ? gmailFetchSinceDate : null,
+      }),
+    })
+    const json = await res.json()
+    setIsSavingGmailConnection(false)
+
+    if (!res.ok) {
+      setGmailFetchMessage(`Failed to save: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+
+    setGmailConnection((current) => ({
+      ...current,
+      emailAddress: json.emailAddress ?? current.emailAddress,
+      appPassword: '',
+    }))
+    setGmailFetchSinceDate(json.fetchSinceDate ?? '')
+    setGmailFetchMessage('Gmail connection saved.')
+    await loadGmailStatus()
   }
 
   async function saveGmailFetchSinceDate(fetchSinceDate: string | null) {
@@ -399,55 +436,85 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button asChild variant={gmailStatus?.connected ? 'outline' : 'default'} size="sm">
-            <a href="/api/auth/google?next=/settings">
-              {gmailStatus?.connected ? 'Reconnect Gmail' : 'Connect with Google'}
-            </a>
+          <div className="space-y-1.5">
+            <Label htmlFor="gmail-email" className="text-[12px]">Email</Label>
+            <Input
+              id="gmail-email"
+              type="email"
+              placeholder="you@gmail.com"
+              className="h-8 text-[13px]"
+              value={gmailConnection.emailAddress}
+              onChange={(e) => setGmailConnection((s) => ({ ...s, emailAddress: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gmail-app-password" className="text-[12px]">App password</Label>
+            <Input
+              id="gmail-app-password"
+              type="password"
+              placeholder="16-character app password"
+              className="h-8 text-[13px]"
+              value={gmailConnection.appPassword}
+              onChange={(e) => setGmailConnection((s) => ({ ...s, appPassword: e.target.value }))}
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => void saveGmailConnection()}
+            disabled={isSavingGmailConnection}
+            size="sm"
+            className="w-full"
+          >
+            {isSavingGmailConnection
+              ? 'Saving…'
+              : gmailStatus?.connected
+                ? 'Update Gmail connection'
+                : 'Save Gmail connection'}
           </Button>
           <div className="space-y-3 pt-3 border-t border-border">
-              <div className="space-y-1.5">
-                <Label htmlFor="gmail-fetch-since" className="text-[12px]">
-                  Earliest import date
-                </Label>
-                <Input
-                  id="gmail-fetch-since"
-                  type="date"
-                  className="h-8 text-[13px] max-w-[220px]"
-                  value={gmailFetchSinceDate}
-                  disabled={!gmailStatus?.connected || isSavingGmailFetch}
-                  onChange={(e) => setGmailFetchSinceDate(e.target.value)}
-                />
-                <p className="text-[11px] text-muted-foreground leading-snug">
-                  {!gmailStatus?.connected
-                    ? 'Connect Gmail above to set how far back imports should go.'
-                    : gmailStatus.fetchSinceDate
-                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`
-                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="gmail-fetch-since" className="text-[12px]">
+                Earliest import date
+              </Label>
+              <Input
+                id="gmail-fetch-since"
+                type="date"
+                className="h-8 text-[13px] max-w-[220px]"
+                value={gmailFetchSinceDate}
+                disabled={!gmailStatus?.connected || isSavingGmailFetch}
+                onChange={(e) => setGmailFetchSinceDate(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {!gmailStatus?.connected
+                  ? 'Connect Gmail above to set how far back imports should go.'
+                  : gmailStatus.fetchSinceDate
+                    ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`
+                    : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!gmailStatus?.connected || isSavingGmailFetch}
+                onClick={() =>
+                  void saveGmailFetchSinceDate(gmailFetchSinceDate.trim() ? gmailFetchSinceDate : null)
+                }
+              >
+                {isSavingGmailFetch ? 'Saving…' : 'Save import range'}
+              </Button>
+              {gmailStatus?.connected && gmailStatus.fetchSinceDate ? (
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!gmailStatus?.connected || isSavingGmailFetch}
-                  onClick={() =>
-                    void saveGmailFetchSinceDate(gmailFetchSinceDate.trim() ? gmailFetchSinceDate : null)
-                  }
+                  variant="outline"
+                  disabled={isSavingGmailFetch}
+                  onClick={() => void saveGmailFetchSinceDate(null)}
                 >
-                  {isSavingGmailFetch ? 'Saving…' : 'Save import range'}
+                  Use default window
                 </Button>
-                {gmailStatus?.connected && gmailStatus.fetchSinceDate ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={isSavingGmailFetch}
-                    onClick={() => void saveGmailFetchSinceDate(null)}
-                  >
-                    Use default window
-                  </Button>
-                ) : null}
-              </div>
+              ) : null}
+            </div>
             {gmailFetchMessage ? (
               <p className="text-[12px] text-muted-foreground">{gmailFetchMessage}</p>
             ) : null}

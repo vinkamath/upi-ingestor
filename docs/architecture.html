@@ -172,7 +172,7 @@
     <h2>Overview</h2>
     <p>UPI Ingestor is a personal finance automation pipeline built as a single Next.js application deployed on Vercel. It has no background workers or queues — the entire flow runs synchronously inside a single function invocation, triggered either by a daily cron job or a manual fetch from the dashboard.</p>
     <div class="callout">
-      <strong>Security:</strong> Every credential (Gmail OAuth tokens, Monarch password) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>. Browser-facing routes use the publishable/anon key with SSR sessions; the cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> (server-only, never exposed to the client).
+      <strong>Security:</strong> Every credential (Gmail app passwords, legacy Gmail OAuth tokens, Monarch credentials) is encrypted at rest using AES-256-GCM before being stored in Supabase. All tables enforce Row Level Security scoped to <code>auth.uid() = user_id</code>. Browser-facing routes use the publishable/anon key with SSR sessions; the cron job and pipeline use <code>SUPABASE_SECRET_KEY</code> via <code>lib/supabase/admin.ts</code> (server-only, never exposed to the client).
     </div>
   </section>
 
@@ -195,7 +195,7 @@
           <text x="450" y="64" text-anchor="middle" fill="#777573" font-size="10">Cron + Web UI → Pipeline</text>
 
           <rect x="336" y="116" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
-          <text x="450" y="138" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Gmail API</text>
+          <text x="450" y="138" text-anchor="middle" font-weight="600" font-family="DM Sans, sans-serif">Gmail IMAP</text>
           <text x="450" y="156" text-anchor="middle" fill="#777573" font-size="10">raw email bodies</text>
 
           <rect x="336" y="208" width="228" height="52" rx="9" fill="#fff" stroke="#e0e0e0" stroke-width="1.5"/>
@@ -294,7 +294,7 @@
         <div class="step-num">2</div>
         <div class="step-body">
           <strong>Gmail fetch — <code>email-sources/gmail.ts</code></strong>
-          <p>Loads the user's encrypted Gmail OAuth refresh token from <code>gmail_connections</code>, decrypts it, and calls the Gmail API to list messages matching <code>GMAIL_FETCH_LABEL</code> (default: <code>UPI</code>). The earliest date comes from per-user <code>fetch_since_date</code> in Settings, or <code>GMAIL_FETCH_DAYS_BACK</code> when unset.</p>
+          <p>Loads the user's encrypted Gmail app password from <code>gmail_connections</code>, decrypts it, and uses Gmail IMAP to fetch messages from <code>GMAIL_IMAP_MAILBOX</code> or <code>GMAIL_FETCH_LABEL</code> (default: <code>UPI</code>). The earliest date comes from per-user <code>fetch_since_date</code> in Settings, or <code>GMAIL_FETCH_DAYS_BACK</code> when unset. Legacy OAuth rows can still use the Gmail API fallback.</p>
         </div>
       </div>
       <div class="step">
@@ -344,7 +344,7 @@
         <thead><tr><th>Module</th><th>Role</th><th>Key exports</th></tr></thead>
         <tbody>
           <tr><td><code>lib/pipeline.ts</code></td><td>Pipeline orchestrator</td><td><code>processUserTransactions(userId)</code></td></tr>
-          <tr><td><code>lib/email-sources/gmail.ts</code></td><td>Gmail API client; fetches messages matching the UPI label</td><td><code>fetchGmailTransactions(userId)</code></td></tr>
+          <tr><td><code>lib/email-sources/gmail.ts</code></td><td>Gmail IMAP client; fetches messages from the UPI label mailbox</td><td><code>fetchGmailTransactions(userId)</code></td></tr>
           <tr><td><code>lib/parsers/hdfc.ts</code></td><td>Regex parser for HDFC UPI notification emails</td><td><code>parseHdfc(body)</code></td></tr>
           <tr><td><code>lib/parsers/index.ts</code></td><td>Parser registry — tries all parsers; returns first match</td><td><code>parseEmail(body)</code></td></tr>
           <tr><td><code>lib/categorizer/engine.ts</code></td><td>Two-pass categorization: rules → merchant mappings → unknown</td><td><code>categorizeTransaction(supabase, userId, tx)</code></td></tr>
@@ -373,7 +373,7 @@
           <tr><td><code>POST /api/transactions/:id/republish</code></td><td><span class="badge badge-muted">session</span></td><td>Retry a failed Monarch publish</td></tr>
           <tr><td><code>GET/POST /api/rules</code></td><td><span class="badge badge-muted">session</span></td><td>List / create categorization rules</td></tr>
           <tr><td><code>DELETE /api/rules/:id</code></td><td><span class="badge badge-muted">session</span></td><td>Delete a rule</td></tr>
-          <tr><td><code>GET /api/auth/google</code></td><td>—</td><td>Initiates Google OAuth flow</td></tr>
+          <tr><td><code>GET /api/auth/google</code></td><td>—</td><td>Initiates Google sign-in</td></tr>
           <tr><td><code>POST /api/connect/telegram</code></td><td><span class="badge badge-muted">session</span></td><td>Generates a Telegram link code</td></tr>
           <tr><td><code>POST /api/connect/monarch</code></td><td><span class="badge badge-muted">session</span></td><td>Stores encrypted Monarch credential</td></tr>
           <tr><td><code>GET /api/connect/monarch/categories</code></td><td><span class="badge badge-muted">session</span></td><td>Fetches the user's Monarch category list</td></tr>
@@ -416,7 +416,9 @@
         <div class="schema-table-name">gmail_connections</div>
         <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid PK</span></div>
         <div class="schema-field"><span class="field-name">email_address</span><span class="field-type">text</span></div>
-        <div class="schema-field"><span class="field-name">refresh_token_enc</span><span class="field-type">jsonb</span><span class="field-note">AES-GCM</span></div>
+        <div class="schema-field"><span class="field-name">auth_type</span><span class="field-type">text</span></div>
+        <div class="schema-field"><span class="field-name">app_password_enc</span><span class="field-type">jsonb?</span><span class="field-note">AES-GCM</span></div>
+        <div class="schema-field"><span class="field-name">refresh_token_enc</span><span class="field-type">jsonb?</span><span class="field-note">legacy</span></div>
         <div class="schema-table-name" style="margin-top: 20px;">monarch_connections</div>
         <div class="schema-field"><span class="field-name">user_id</span><span class="field-type">uuid PK</span></div>
         <div class="schema-field"><span class="field-name">email</span><span class="field-type">text</span></div>

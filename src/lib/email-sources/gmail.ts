@@ -3,6 +3,7 @@ import type { ParsedTransaction } from '@/lib/types/domain'
 import { parseUpiEmail } from '@/lib/parsers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { decrypt } from '@/lib/crypto/encryption'
+import { fetchGmailMessagesViaImap } from '@/lib/email-sources/gmail-imap'
 import {
   getDefaultFetchDaysBack,
   getDefaultFetchMaxResults,
@@ -47,7 +48,7 @@ function extractTextPlainBody(part?: gmail_v1.Schema$MessagePart): string | null
 }
 
 export type GmailFetchError = {
-  code: 'not_connected' | 'invalid_grant' | 'fetch_failed'
+  code: 'not_connected' | 'auth_failed' | 'invalid_grant' | 'fetch_failed'
   message: string
   needsReconnect: boolean
 }
@@ -82,7 +83,18 @@ function getErrorMessage(error: unknown): string {
 
 function toGmailFetchError(error: unknown): GmailFetchError {
   const raw = getErrorMessage(error)
+  const authFailed =
+    raw.includes('AUTHENTICATIONFAILED') ||
+    raw.includes('Invalid credentials') ||
+    raw.includes('Application-specific password required')
   const needsReconnect = raw.includes('invalid_grant')
+  if (authFailed) {
+    return {
+      code: 'auth_failed',
+      message: 'Gmail app password was rejected. Update it in Settings → Gmail.',
+      needsReconnect: true,
+    }
+  }
   if (needsReconnect) {
     return {
       code: 'invalid_grant',
@@ -101,11 +113,14 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   const supabase = createAdminClient()
   const { data: connection, error } = await supabase
     .from('gmail_connections')
-    .select('refresh_token_enc,last_history_id,email_address,fetch_since_date')
+    .select('auth_type,app_password_enc,refresh_token_enc,last_history_id,email_address,fetch_since_date')
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (error || !connection) {
+  const appPasswordPayload = connection?.app_password_enc as { iv: string; content: string; authTag: string } | null
+  const refreshTokenPayload = connection?.refresh_token_enc as { iv: string; content: string; authTag: string } | null
+
+  if (error || !connection || (!appPasswordPayload && !refreshTokenPayload)) {
     return {
       transactions: [],
       error: {
@@ -126,15 +141,71 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   }
 
   try {
-    const refreshToken = decrypt(connection.refresh_token_enc as { iv: string; content: string; authTag: string })
-    const auth = getOauthClient(refreshToken)
-    const gmail = google.gmail({ version: 'v1', auth })
     const maxResults = getDefaultFetchMaxResults()
     const labelName = process.env.GMAIL_FETCH_LABEL?.trim() || 'UPI'
     const fetchSinceDate = connection.fetch_since_date as string | null
     const afterEpoch = fetchSinceDate
       ? getIstMidnightEpochSecondsForYmd(fetchSinceDate)
       : getIstMidnightCutoffEpochSeconds(getDefaultFetchDaysBack())
+    const parsed: ParsedTransaction[] = []
+    const sampleSubjects: string[] = []
+    let skippedNoBody = 0
+    let skippedParseFailure = 0
+    const parseErrors: GmailFetchResult['debug']['parseErrors'] = []
+
+    if (appPasswordPayload) {
+      const appPassword = decrypt(appPasswordPayload)
+      const messages = await fetchGmailMessagesViaImap({
+        emailAddress: connection.email_address as string,
+        appPassword,
+        labelName,
+        afterEpochSeconds: afterEpoch,
+        maxResults,
+      })
+
+      for (const message of messages) {
+        if (sampleSubjects.length < 5) sampleSubjects.push(message.subject)
+
+        if (!message.body) {
+          skippedNoBody += 1
+          continue
+        }
+
+        const tx = parseUpiEmail(message.id, message.from, message.body)
+        if (tx) {
+          parsed.push({
+            ...tx,
+            occurredAt: message.receivedAt,
+            emailReceivedAt: message.receivedAt,
+          })
+        } else {
+          skippedParseFailure += 1
+          parseErrors.push({
+            messageId: message.id,
+            subject: message.subject,
+            from: message.from,
+            reason: 'missing_or_invalid_required_fields',
+          })
+        }
+      }
+
+      return {
+        transactions: parsed,
+        debug: {
+          query: `imap mailbox:${process.env.GMAIL_IMAP_MAILBOX?.trim() || labelName} since:${afterEpoch}`,
+          matchedMessages: messages.length,
+          parsedTransactions: parsed.length,
+          skippedNoBody,
+          skippedParseFailure,
+          sampleSubjects,
+          parseErrors,
+        },
+      }
+    }
+
+    const refreshToken = decrypt(refreshTokenPayload!)
+    const auth = getOauthClient(refreshToken)
+    const gmail = google.gmail({ version: 'v1', auth })
     const query = `label:${labelName} after:${afterEpoch}`
 
     const list = await gmail.users.messages.list({
@@ -144,11 +215,6 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
     })
 
     const messages = list.data.messages ?? []
-    const parsed: ParsedTransaction[] = []
-    const sampleSubjects: string[] = []
-    let skippedNoBody = 0
-    let skippedParseFailure = 0
-    const parseErrors: GmailFetchResult['debug']['parseErrors'] = []
 
     for (const message of messages) {
       if (!message.id) continue
