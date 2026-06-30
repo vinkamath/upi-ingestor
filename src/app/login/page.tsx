@@ -25,7 +25,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <h2 className="text-[15px] font-semibold text-foreground">Sign in to continue</h2>
             <p className="text-[13px] text-muted-foreground">
-              Connect your Gmail to start importing UPI transactions.
+              Sign in, then add your Gmail app password in Settings.
             </p>
           </div>
 

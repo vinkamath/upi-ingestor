@@ -16,7 +16,7 @@
 </p>
 <p>
   <a href="https://supabase.com"><img src="https://img.shields.io/badge/Supabase-Auth%20%2B%20Postgres-2daf6f?style=for-the-badge&logo=supabase&logoColor=f6f5f3&labelColor=22201d"/></a>
-  <a href="https://developers.google.com/gmail/api"><img src="https://img.shields.io/badge/Gmail-API-ff692d?style=for-the-badge&logo=gmail&logoColor=f6f5f3&labelColor=22201d"/></a>
+  <a href="https://support.google.com/mail/answer/7126229"><img src="https://img.shields.io/badge/Gmail-IMAP-ff692d?style=for-the-badge&logo=gmail&logoColor=f6f5f3&labelColor=22201d"/></a>
   <a href="https://core.telegram.org/bots/api"><img src="https://img.shields.io/badge/Telegram-Bot-f2c94c?style=for-the-badge&logo=telegram&logoColor=22201d&labelColor=22201d"/></a>
   <a href="https://vercel.com"><img src="https://img.shields.io/badge/Vercel-Deploy-f6f5f3?style=for-the-badge&logo=vercel&logoColor=22201d&labelColor=22201d"/></a>
 </p>
@@ -120,7 +120,7 @@ git clone <repo-url> && cd upi-ingestor && npm install
 # 2. environment
 cp .env.example .env.local
 # fill in: Supabase URL + anon key + secret key, ENCRYPTION_KEY,
-#           CRON_SECRET, Google OAuth credentials, Telegram bot token
+#           CRON_SECRET, Telegram bot token
 # MONARCH_GRAPHQL_URL is pre-filled — no change needed
 
 # 3. database — apply all migrations via the Supabase SQL editor
@@ -130,7 +130,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Full service-by-service setup (Google Cloud Console, Telegram BotFather, Supabase, Monarch, Vercel deployment) → **[docs/setup.html](docs/setup.html)**
+Full service-by-service setup (Gmail, Telegram BotFather, Supabase, Monarch, Vercel deployment) → **[docs/setup.html](docs/setup.html)**
 
 <div align="center">
 <a href="#"><img src="https://capsule-render.vercel.app/api?type=waving&color=0:22201d,100:ff692d&height=80&section=footer" width="100%" alt="footer wave"/></a>
