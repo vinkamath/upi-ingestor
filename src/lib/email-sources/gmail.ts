@@ -71,6 +71,43 @@ export type GmailFetchResult = {
   }
 }
 
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>
+
+async function markFetchSucceeded(supabase: SupabaseAdminClient, userId: string) {
+  const { error } = await supabase
+    .from('gmail_connections')
+    .update({
+      last_success_at: new Date().toISOString(),
+      invalid_since: null,
+      last_error_code: null,
+      last_error_message: null,
+    })
+    .eq('user_id', userId)
+
+  if (error) console.error('gmail.health_update_failed', { userId, error })
+}
+
+async function markFetchFailed(
+  supabase: SupabaseAdminClient,
+  userId: string,
+  fetchError: GmailFetchError,
+  invalidSince: string | null
+) {
+  const patch: Record<string, string | null> = {
+    last_error_code: fetchError.code,
+    last_error_message: fetchError.message,
+  }
+
+  // Keep the first time the credential went bad so Settings can show how long it
+  // has been broken. Only a reconnect or a successful fetch clears it.
+  if (fetchError.needsReconnect) {
+    patch.invalid_since = invalidSince ?? new Date().toISOString()
+  }
+
+  const { error } = await supabase.from('gmail_connections').update(patch).eq('user_id', userId)
+  if (error) console.error('gmail.health_update_failed', { userId, error })
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const cause = (error as Error & { cause?: { message?: string } }).cause
@@ -101,7 +138,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   const supabase = createAdminClient()
   const { data: connection, error } = await supabase
     .from('gmail_connections')
-    .select('refresh_token_enc,last_history_id,email_address,fetch_since_date')
+    .select('refresh_token_enc,last_history_id,email_address,fetch_since_date,invalid_since')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -186,6 +223,8 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
       }
     }
 
+    await markFetchSucceeded(supabase, userId)
+
     return {
       transactions: parsed,
       debug: {
@@ -201,6 +240,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   } catch (error) {
     const fetchError = toGmailFetchError(error)
     console.error('gmail.fetch_failed', { userId, code: fetchError.code, error })
+    await markFetchFailed(supabase, userId, fetchError, connection.invalid_since as string | null)
     return {
       transactions: [],
       error: fetchError,

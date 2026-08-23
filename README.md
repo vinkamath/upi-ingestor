@@ -130,6 +130,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
+> [!IMPORTANT]
+> **Publish your Google OAuth app to production.** While the OAuth consent screen is in *Testing*, Google expires every refresh token after **7 days**, so Gmail imports die every few days with `invalid_grant`. Fix it in the Cloud Console — **APIs & Services → OAuth consent screen → Publish app** — then reconnect once from **Settings → Gmail**, since publishing does not extend a token that was already issued under Testing. Expect a "Google hasn't verified this app" interstitial (Advanced → Go to app); that is normal for an unverified personal deployment using the restricted `gmail.readonly` scope. Details and the remaining ways a token can be invalidated → [docs/setup.html](docs/setup.html#google-oauth).
+
 Full service-by-service setup (Google Cloud Console, Telegram BotFather, Supabase, Monarch, Vercel deployment) → **[docs/setup.html](docs/setup.html)**
 
 <div align="center">

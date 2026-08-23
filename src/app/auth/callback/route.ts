@@ -22,6 +22,12 @@ export async function GET(request: Request) {
           user_id: userId,
           email_address: userEmail.toLowerCase(),
           refresh_token_enc: encrypted,
+          // A fresh grant clears any prior invalid_grant state so Settings stops
+          // asking for a reconnect straight away.
+          invalid_since: null,
+          last_error_code: null,
+          last_error_message: null,
+          updated_at: new Date().toISOString(),
         })
       }
 

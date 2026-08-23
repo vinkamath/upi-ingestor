@@ -232,7 +232,7 @@ npm run dev
   </section>
 
   <section>
-    <h2>2 — Google OAuth &amp; Gmail API</h2>
+    <h2 id="google-oauth">2 — Google OAuth &amp; Gmail API</h2>
     <div class="service">
       <div class="service-header">
         <div class="service-icon" style="background: #4285F4; color: #fff; font-weight: 700; font-size: 16px;">G</div>
@@ -243,6 +243,7 @@ npm run dev
           <li>Go to <strong>console.cloud.google.com</strong> → create or reuse a project.</li>
           <li>Enable the <strong>Gmail API</strong>: APIs &amp; Services → Library → search "Gmail API" → Enable.</li>
           <li>Go to <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose <em>External</em>. Add scope <code>https://www.googleapis.com/auth/gmail.readonly</code>. Add your own Gmail address as a test user.</li>
+          <li><strong>Publish the app to production</strong> — see the callout below. Skipping this is why Gmail imports stop every few days.</li>
           <li>Go to <strong>Credentials → Create Credentials → OAuth client ID</strong>. Application type: <em>Web application</em>. Add redirect URIs:
             <pre>http://localhost:3000/api/auth/google        # local dev
 https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
@@ -251,7 +252,16 @@ https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
           <li>In Gmail, create a label called <strong>UPI</strong> (or whatever you set <code>GMAIL_FETCH_LABEL</code> to), then set a filter to auto-apply it to your bank's notification emails.</li>
         </ol>
         <div class="callout callout-warn">
-          <strong>Heads up:</strong> while your OAuth app is in <em>Testing</em> mode, refresh tokens expire after 7 days. Publish the app to get non-expiring tokens.
+          <strong>Gmail imports stop after 7 days?</strong> That is Google, not the app. While the OAuth consent screen sits in <em>Testing</em>, every refresh token Google issues expires after 7 days — the pipeline then fails with <code>invalid_grant</code> and Settings shows <em>Reconnect required</em>. Publishing the app to production is the fix; there is nothing to change in the code.
+          <ol class="step-list" style="margin-top: 10px;">
+            <li>Google Cloud Console → <strong>APIs &amp; Services → OAuth consent screen</strong> (newer consoles: <strong>Google Auth Platform → Audience</strong>).</li>
+            <li>Under <strong>Publishing status</strong>, click <strong>Publish app</strong> and confirm. The status flips from <em>Testing</em> to <em>In production</em>.</li>
+            <li>Reconnect once: <strong>Settings → Gmail → Reconnect Gmail</strong>. This step is not optional — publishing does not retroactively extend a token that was already issued under Testing, so the existing one still dies at its 7-day mark. One fresh consent gets you a non-expiring replacement.</li>
+          </ol>
+          <p style="margin-top: 10px;"><strong>What to expect after publishing.</strong> <code>gmail.readonly</code> is a <em>restricted</em> scope, so an unverified production app shows a "Google hasn't verified this app" interstitial on the consent screen — click <strong>Advanced → Go to &lt;app&gt; (unsafe)</strong> to continue. That is normal for a personal deployment, and it caps at 100 users. Clearing the warning means going through OAuth verification, which for restricted scopes also requires an annual third-party CASA security assessment — rarely worth it for a single-user instance.</p>
+        </div>
+        <div class="callout">
+          <strong>Tokens can still go bad in production.</strong> Non-expiring is not unconditional: Google invalidates a refresh token if you revoke access at <code>myaccount.google.com/permissions</code>, change your Google account password, leave the app unused for 6 months, or accumulate more than 100 live tokens for the same client and account (the oldest are dropped silently). When that happens the pipeline records it and Settings switches to <em>Reconnect required</em> with the reason and the time of the last successful import — reconnect from that card to resume.
         </div>
       </div>
     </div>

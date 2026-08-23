@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   CircleCheck,
   CircleDashed,
+  TriangleAlert,
   Mail,
   Landmark,
   MessageSquare,
@@ -31,7 +32,33 @@ const selectStyle = {
   backgroundPosition: 'right 8px center',
 }
 
-function ConnectionStatus({ connected }: { connected: boolean }) {
+function formatDateTime(value: string) {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
+function ConnectionStatus({
+  connected,
+  needsAttention = false,
+}: {
+  connected: boolean
+  needsAttention?: boolean
+}) {
+  // A stored credential that Google has since rejected is still a row in the
+  // database, so "connected" alone would read as healthy when it isn't.
+  if (connected && needsAttention) {
+    return (
+      <span className="flex items-center gap-1.5 text-[12px] font-medium text-warning">
+        <TriangleAlert className="h-3.5 w-3.5" />
+        Reconnect required
+      </span>
+    )
+  }
+
   return (
     <span
       className={cn(
@@ -52,6 +79,9 @@ function ConnectionStatus({ connected }: { connected: boolean }) {
 export default function SettingsPage() {
   const [gmailStatus, setGmailStatus] = useState<{
     connected: boolean
+    needsReconnect: boolean
+    invalidSince: string | null
+    lastSuccessAt: string | null
     emailAddress: string | null
     lastUpdatedAt: string | null
     fetchSinceDate: string | null
@@ -395,11 +425,35 @@ export default function SettingsPage() {
                 </CardDescription>
               </div>
             </div>
-            <ConnectionStatus connected={gmailStatus?.connected ?? false} />
+            <ConnectionStatus
+              connected={gmailStatus?.connected ?? false}
+              needsAttention={gmailStatus?.needsReconnect ?? false}
+            />
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button asChild variant={gmailStatus?.connected ? 'outline' : 'default'} size="sm">
+          {gmailStatus?.needsReconnect ? (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 space-y-1">
+              <p className="text-[12px] font-medium text-foreground">
+                Gmail imports are paused
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Google rejected the saved credential — it expired or was revoked. Reconnect below to
+                resume imports.
+                {gmailStatus.invalidSince
+                  ? ` Failing since ${formatDateTime(gmailStatus.invalidSince)}.`
+                  : ''}
+                {gmailStatus.lastSuccessAt
+                  ? ` Last successful import ${formatDateTime(gmailStatus.lastSuccessAt)}.`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
+          <Button
+            asChild
+            variant={gmailStatus?.connected && !gmailStatus.needsReconnect ? 'outline' : 'default'}
+            size="sm"
+          >
             <a href="/api/auth/google?next=/settings">
               {gmailStatus?.connected ? 'Reconnect Gmail' : 'Connect with Google'}
             </a>
