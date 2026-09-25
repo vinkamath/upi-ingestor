@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { RefreshCw, Trash2, Upload, CheckSquare, AlertCircle, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -131,6 +132,7 @@ export default function TransactionsPage() {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null)
   const [defaultAccountId, setDefaultAccountId] = useState<string | null>(null)
   const [pinnedCategoryNames, setPinnedCategoryNames] = useState<string[]>([])
+  const [monarchWarning, setMonarchWarning] = useState<string | null>(null)
   const [publishDropdownOpen, setPublishDropdownOpen] = useState(false)
   const publishSplitRef = useRef<HTMLDivElement>(null)
 
@@ -146,7 +148,9 @@ export default function TransactionsPage() {
     setCategoryDrafts((prev) => {
       const next = { ...prev }
       for (const tx of rows as Tx[]) {
-        next[tx.id] = prev[tx.id] ?? tx.category ?? ''
+        // Prefer a non-empty local draft; otherwise pick up categories set server-side
+        // (e.g. filled in from a sibling transaction of the same merchant).
+        next[tx.id] = prev[tx.id] || tx.category || ''
       }
       return next
     })
@@ -162,10 +166,22 @@ export default function TransactionsPage() {
   }
 
   async function loadCategories() {
-    const res = await fetch('/api/connect/monarch/categories')
-    const json = await res.json()
-    if (!res.ok) return
-    setCategories((json?.categories ?? []) as MonarchCategoryOption[])
+    try {
+      const res = await fetch('/api/connect/monarch/categories')
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        setCategories([])
+        setMonarchWarning(json?.error ?? `Could not load Monarch categories (HTTP ${res.status}).`)
+        return
+      }
+      setCategories((json?.categories ?? []) as MonarchCategoryOption[])
+      setMonarchWarning(null)
+    } catch (error) {
+      setCategories([])
+      setMonarchWarning(
+        `Could not load Monarch categories (${error instanceof Error ? error.message : 'network error'}).`
+      )
+    }
   }
 
   async function loadMonarchConnection() {
@@ -196,6 +212,7 @@ export default function TransactionsPage() {
     }
     const json = await res.json()
     const summary = json?.summary
+    const count = await load()
     if (summary?.gmailError) {
       setStatusMessage({
         text: summary.gmailError.message,
@@ -203,10 +220,9 @@ export default function TransactionsPage() {
       })
       return
     }
-    const count = await load()
     if (summary) {
       setStatusMessage({
-        text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${count} total`,
+        text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${summary.autoCategorized ?? 0} auto-categorized · ${count} total`,
       })
       return
     }
@@ -513,6 +529,21 @@ export default function TransactionsPage() {
       </div>
 
       {/* Status message */}
+      {monarchWarning && (
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+          <span>
+            {monarchWarning}{' '}
+            <Link
+              href="/settings"
+              className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Open Settings
+            </Link>
+          </span>
+        </div>
+      )}
+
       {statusMessage && (
         <div
           className={cn(

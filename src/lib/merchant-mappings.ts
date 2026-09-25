@@ -43,5 +43,47 @@ export async function learnMerchantMapping(args: {
   })
   if (pruneError) return { ok: false as const, reason: pruneError.message }
 
-  return { ok: true as const, merchantKey }
+  const appliedTo = await applyCategoryToOpenTransactions({
+    supabase: args.supabase,
+    userId: args.userId,
+    merchantKey,
+    category: args.category,
+  })
+
+  return { ok: true as const, merchantKey, appliedTo }
+}
+
+/**
+ * Fills in the category on other uncategorized, unpublished review rows from the same merchant,
+ * so categorizing one transaction categorizes its siblings too. Status is left as-is so the
+ * user still reviews and publishes them.
+ */
+async function applyCategoryToOpenTransactions(args: {
+  supabase: SupabaseClient
+  userId: string
+  merchantKey: string
+  category: string
+}) {
+  const { data: rows, error } = await args.supabase
+    .from('transactions')
+    .select('id,merchant_raw')
+    .eq('user_id', args.userId)
+    .eq('status', 'needs_review')
+    .is('category', null)
+    .is('published_id', null)
+    .limit(500)
+  if (error || !rows) return 0
+
+  const ids = (rows as Array<{ id: string; merchant_raw: string }>)
+    .filter((row) => normalizeMerchant(row.merchant_raw) === args.merchantKey)
+    .map((row) => row.id)
+  if (ids.length === 0) return 0
+
+  const { error: updateError } = await args.supabase
+    .from('transactions')
+    .update({ category: args.category })
+    .eq('user_id', args.userId)
+    .in('id', ids)
+  if (updateError) return 0
+  return ids.length
 }

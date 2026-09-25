@@ -11,7 +11,9 @@ type RuleRow = {
   priority: number
 }
 
-function ruleMatches(rule: RuleRow, tx: ParsedTransaction) {
+type CategorizableTransaction = Pick<ParsedTransaction, 'merchantRaw' | 'rawPayload'>
+
+function ruleMatches(rule: RuleRow, tx: CategorizableTransaction) {
   const value =
     rule.field === 'merchant'
       ? tx.merchantRaw
@@ -29,29 +31,45 @@ function ruleMatches(rule: RuleRow, tx: ParsedTransaction) {
   }
 }
 
-export async function categorizeTransaction(
-  supabase: SupabaseClient,
-  userId: string,
-  tx: ParsedTransaction
-): Promise<CategorizeResult> {
-  const { data: rules } = await supabase
+const MAPPING_LOOKUP_CHUNK = 100
+
+/**
+ * Loads a user's rules, plus the merchant mappings for the given merchants, once so many
+ * transactions can be categorized without a round trip per transaction.
+ */
+export async function createCategorizer(supabase: SupabaseClient, userId: string, merchantRaws: string[]) {
+  const { data: rules, error: rulesError } = await supabase
     .from('rules')
     .select('*')
     .eq('user_id', userId)
     .order('priority', { ascending: true })
+  if (rulesError) console.error('categorizer.rules_load_failed', { userId, error: rulesError })
+  const ruleRows = (rules as RuleRow[] | null) ?? []
 
-  const matchingRule = (rules as RuleRow[] | null)?.find((rule) => ruleMatches(rule, tx))
-  if (matchingRule) return { category: matchingRule.category, source: 'rule' }
+  const merchantKeys = [...new Set(merchantRaws.map(normalizeMerchant).filter(Boolean))]
+  const mappingByKey = new Map<string, string>()
+  for (let i = 0; i < merchantKeys.length; i += MAPPING_LOOKUP_CHUNK) {
+    const { data: mappings, error: mappingsError } = await supabase
+      .from('merchant_mappings')
+      .select('merchant_key,category')
+      .eq('user_id', userId)
+      .in('merchant_key', merchantKeys.slice(i, i + MAPPING_LOOKUP_CHUNK))
+    if (mappingsError) {
+      console.error('categorizer.mappings_load_failed', { userId, error: mappingsError })
+      continue
+    }
+    for (const row of (mappings as Array<{ merchant_key: string; category: string | null }> | null) ?? []) {
+      if (row.category) mappingByKey.set(row.merchant_key, row.category)
+    }
+  }
 
-  const merchantKey = normalizeMerchant(tx.merchantRaw)
-  const { data: mapping } = await supabase
-    .from('merchant_mappings')
-    .select('category')
-    .eq('user_id', userId)
-    .eq('merchant_key', merchantKey)
-    .maybeSingle()
+  return (tx: CategorizableTransaction): CategorizeResult => {
+    const matchingRule = ruleRows.find((rule) => ruleMatches(rule, tx))
+    if (matchingRule) return { category: matchingRule.category, source: 'rule' }
 
-  if (mapping?.category) return { category: mapping.category, source: 'mapping' }
+    const mapped = mappingByKey.get(normalizeMerchant(tx.merchantRaw))
+    if (mapped) return { category: mapped, source: 'mapping' }
 
-  return { category: null, source: 'unknown' }
+    return { category: null, source: 'unknown' }
+  }
 }

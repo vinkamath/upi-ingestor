@@ -251,7 +251,13 @@ https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
           <li>In Gmail, create a label called <strong>UPI</strong> (or whatever you set <code>GMAIL_FETCH_LABEL</code> to), then set a filter to auto-apply it to your bank's notification emails.</li>
         </ol>
         <div class="callout callout-warn">
-          <strong>Heads up:</strong> while your OAuth app is in <em>Testing</em> mode, refresh tokens expire after 7 days. Publish the app to get non-expiring tokens.
+          <strong>Stop the weekly re-auth:</strong> while your OAuth app's publishing status is <em>Testing</em>, Google expires refresh tokens after 7 days, so Gmail fetches start failing with <code>invalid_grant</code> every week. To fix it:
+          <ol class="step-list">
+            <li>Open <strong>Google Auth Platform → Audience</strong> (older consoles: <strong>APIs &amp; Services → OAuth consent screen</strong>) and click <strong>Publish app</strong> → <em>In production</em>.</li>
+            <li>You do not need to submit for verification for personal use (under 100 users). Google will show an "app isn't verified" screen when you connect — choose <em>Advanced → Go to &lt;app&gt; (unsafe)</em>.</li>
+            <li>Reconnect Gmail once (log out and sign in again). Tokens issued while in Testing keep their 7-day expiry; the new one does not expire unless revoked, the Google password changes, or it goes unused for 6 months.</li>
+          </ol>
+          If this Google Cloud project is also the one configured as the Google provider in Supabase Auth, that is the one to publish.
         </div>
       </div>
     </div>
