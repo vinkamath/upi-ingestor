@@ -219,7 +219,11 @@ npm run dev
 202605051640_pending_reviews_unique.sql
 202605061832_monarch_fx_cache.sql
 202605061845_transactions_email_received_at.sql
-202605071220_merchant_mappings_last_seen_and_prune.sql</pre>
+202605071220_merchant_mappings_last_seen_and_prune.sql
+202605171200_user_preferences.sql
+202605191200_gmail_fetch_since_date.sql
+202606041200_no_remember_tags.sql
+202609251200_gmail_imap_app_password.sql</pre>
             Alternatively, if you have the Supabase CLI linked: <code>supabase db push</code>
           </li>
           <li>Verify RLS is enabled: in the dashboard go to <strong>Table Editor</strong>, click any table, and confirm the lock icon is shown.</li>
@@ -251,13 +255,13 @@ https://&lt;your-vercel-domain&gt;/api/auth/google  # production</pre>
           <li>In Gmail, create a label called <strong>UPI</strong> (or whatever you set <code>GMAIL_FETCH_LABEL</code> to), then set a filter to auto-apply it to your bank's notification emails.</li>
         </ol>
         <div class="callout callout-warn">
-          <strong>Stop the weekly re-auth:</strong> while your OAuth app's publishing status is <em>Testing</em>, Google expires refresh tokens after 7 days, so Gmail fetches start failing with <code>invalid_grant</code> every week. To fix it:
+          <strong>Stop the weekly re-auth:</strong> while your OAuth app's publishing status is <em>Testing</em>, Google expires refresh tokens after 7 days (publishing needs a verified domain). Instead, let the app read Gmail over IMAP with an App Password, which doesn't expire:
           <ol class="step-list">
-            <li>Open <strong>Google Auth Platform → Audience</strong> (older consoles: <strong>APIs &amp; Services → OAuth consent screen</strong>) and click <strong>Publish app</strong> → <em>In production</em>.</li>
-            <li>You do not need to submit for verification for personal use (under 100 users). Google will show an "app isn't verified" screen when you connect — choose <em>Advanced → Go to &lt;app&gt; (unsafe)</em>.</li>
-            <li>Reconnect Gmail once (log out and sign in again). Tokens issued while in Testing keep their 7-day expiry; the new one does not expire unless revoked, the Google password changes, or it goes unused for 6 months.</li>
+            <li>Turn on <strong>2-Step Verification</strong> for your Google account (required for app passwords).</li>
+            <li>Open <strong>myaccount.google.com/apppasswords</strong>, create one named e.g. "UPI Ingestor", and copy the 16-letter password.</li>
+            <li>In the app, go to <strong>Settings → Gmail</strong>, paste it into <em>Gmail app password (IMAP)</em> and click Save. The app checks it against Gmail before storing it (encrypted with <code>ENCRYPTION_KEY</code>).</li>
           </ol>
-          If this Google Cloud project is also the one configured as the Google provider in Supabase Auth, that is the one to publish.
+          Google sign-in is still used to log in to the app; only mail fetching moves to IMAP. The app password stops working only if you revoke it or change your Google password. Apply migration <code>202609251200_gmail_imap_app_password.sql</code> first.
         </div>
       </div>
     </div>
