@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { publishers } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
-import { sendTelegramMessage } from '@/lib/telegram/client'
+import { answerCallbackQuery, editTelegramMessageText, sendTelegramMessage } from '@/lib/telegram/client'
+import { MANUAL_CATEGORY, parseCategoryCallback } from '@/lib/telegram/review-keyboard'
 import { parseStartLinkCode } from '@/lib/telegram/start-command'
 
 export async function POST(request: Request) {
@@ -78,32 +79,73 @@ export async function POST(request: Request) {
     typeof body === 'object' && body !== null && 'callback_query' in body
       ? ((body as Record<string, unknown>).callback_query as Record<string, unknown> | undefined)
       : undefined
-  if (!callback?.data) return Response.json({ ok: true })
-  if (callback?.id) {
-    const { data: pendingByCallback } = await supabase
-      .from('pending_reviews')
-      .select('id')
-      .eq(
-        'telegram_message_id',
-        String(
-          typeof callback.message === 'object' && callback.message !== null
-            ? ((callback.message as Record<string, unknown>).message_id ?? '')
-            : ''
-        )
-      )
-      .maybeSingle()
+  if (!callback?.data || typeof callback.id !== 'string') return Response.json({ ok: true })
+  const callbackId = callback.id
 
-    if (!pendingByCallback) return Response.json({ ok: true })
+  const callbackMessage =
+    typeof callback.message === 'object' && callback.message !== null
+      ? (callback.message as Record<string, unknown>)
+      : undefined
+  const messageId = typeof callbackMessage?.message_id === 'number' ? callbackMessage.message_id : undefined
+  const messageChat =
+    typeof callbackMessage?.chat === 'object' && callbackMessage.chat !== null
+      ? (callbackMessage.chat as Record<string, unknown>)
+      : undefined
+  const messageChatId = messageChat?.id ? String(messageChat.id) : undefined
+  const replyMarkup =
+    typeof callbackMessage?.reply_markup === 'object' && callbackMessage.reply_markup !== null
+      ? (callbackMessage.reply_markup as Record<string, unknown>)
+      : undefined
+
+  const ack = async (text?: string) => {
+    try {
+      await answerCallbackQuery(callbackId, text)
+    } catch (error) {
+      console.error('telegram.callback_ack_failed', { error })
+    }
+  }
+  const replaceMessage = async (text: string) => {
+    if (!messageChatId || messageId === undefined) return
+    try {
+      await editTelegramMessageText(messageChatId, messageId, text)
+    } catch (error) {
+      console.error('telegram.callback_edit_failed', { error })
+    }
   }
 
-  const [prefix, txId, category] = String(callback.data).split(':')
-  if (prefix !== 'cat' || !txId || !category || category === '__manual__') {
+  const parsed = parseCategoryCallback(String(callback.data), replyMarkup?.inline_keyboard)
+  if (!parsed) {
+    await ack()
+    return Response.json({ ok: true })
+  }
+  const { txId, category } = parsed
+
+  if (category === MANUAL_CATEGORY) {
+    await ack('Typing a new category is not supported yet. Use the Transactions page.')
+    return Response.json({ ok: true })
+  }
+
+  const { data: pendingReview } = await supabase
+    .from('pending_reviews')
+    .select('id')
+    .eq('transaction_id', txId)
+    .eq('telegram_message_id', String(messageId ?? ''))
+    .maybeSingle()
+
+  if (!pendingReview) {
+    await ack('This transaction was already handled.')
     return Response.json({ ok: true })
   }
 
   const { data: tx } = await supabase.from('transactions').select('*').eq('id', txId).maybeSingle()
-  if (!tx) return Response.json({ ok: true })
-  if (tx.status === 'published') return Response.json({ ok: true })
+  if (!tx) {
+    await ack('Transaction not found.')
+    return Response.json({ ok: true })
+  }
+  if (tx.status === 'published') {
+    await ack('Already published.')
+    return Response.json({ ok: true })
+  }
 
   await learnMerchantMapping({
     supabase,
@@ -142,6 +184,17 @@ export async function POST(request: Request) {
     .eq('id', txId)
 
   await supabase.from('pending_reviews').delete().eq('transaction_id', txId)
+
+  const summaryLine = `INR ${tx.amount} at ${tx.merchant_raw}`
+  if (publish.success) {
+    await ack(`Published as ${category}`)
+    await replaceMessage(`${summaryLine}: categorized as ${category} and published to Monarch.`)
+  } else {
+    await ack('Publish failed')
+    await replaceMessage(
+      `${summaryLine}: categorized as ${category}, but publishing to Monarch failed. Retry from the Transactions page.`
+    )
+  }
 
   return Response.json({ ok: true })
 }

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { categorizeTransaction } from '@/lib/categorizer/engine'
 import { fetchGmailTransactions } from '@/lib/email-sources/gmail'
 import { sendTelegramMessage } from '@/lib/telegram/client'
+import { buildReviewKeyboard, loadQuickCategoryNames } from '@/lib/telegram/review-keyboard'
 import { publishers } from '@/lib/publishers'
 
 export async function processUserTransactions(userId: string) {
@@ -111,24 +112,11 @@ export async function processUserTransactions(userId: string) {
         summary.needsReview += 1
 
         if (tgLink?.chat_id) {
-          const { data: categories } = await supabase
-            .from('rules')
-            .select('category')
-            .eq('user_id', userId)
-            .limit(3)
-
-          const buttons = (categories ?? []).map((c) => [
-            { text: c.category, callback_data: `cat:${inserted.id}:${c.category}` },
-          ])
+          const quickCategories = await loadQuickCategoryNames(supabase, userId)
           const sent = await sendTelegramMessage(
             tgLink.chat_id,
             `Uncategorized transaction: INR ${tx.amount} at ${tx.merchantRaw}. Pick a category:`,
-            {
-              inline_keyboard: [
-                ...buttons,
-                [{ text: 'Type new category', callback_data: `cat:${inserted.id}:__manual__` }],
-              ],
-            }
+            buildReviewKeyboard(inserted.id, quickCategories)
           )
 
           await supabase.from('pending_reviews').upsert(
