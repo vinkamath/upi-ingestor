@@ -43,14 +43,22 @@ async function getTelegramChatId(supabase: SupabaseClient, userId: string) {
   return (data?.chat_id as string | undefined) ?? null
 }
 
-async function promptForCategory(supabase: SupabaseClient, userId: string, chatId: string, row: TransactionRow) {
+async function getQuickCategories(supabase: SupabaseClient, userId: string): Promise<string[]> {
   const { data: prefs } = await supabase
     .from('user_preferences')
     .select('pinned_category_names')
     .eq('user_id', userId)
     .maybeSingle()
-  const quickCategories: string[] = prefs?.pinned_category_names ?? [...DEFAULT_PINNED_CATEGORY_NAMES]
+  return prefs?.pinned_category_names ?? [...DEFAULT_PINNED_CATEGORY_NAMES]
+}
 
+async function promptForCategory(
+  supabase: SupabaseClient,
+  userId: string,
+  chatId: string,
+  row: TransactionRow,
+  quickCategories: string[]
+) {
   const keyboard = buildCategoryKeyboard(row.id, quickCategories)
   // Set automatically on Vercel deployments; absent locally, where Telegram would reject a localhost link anyway.
   const appHost = process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -180,6 +188,9 @@ export async function processUserTransactions(userId: string) {
     .in('status', ['pending', 'needs_review'])
     .is('category', null)
     .is('published_id', null)
+    // 'pending' sorts after 'needs_review': descending puts never-processed rows first so a
+    // backlog of old uncategorized review rows can't push them past the limit.
+    .order('status', { ascending: false })
     .order('occurred_at', { ascending: false })
     .limit(OPEN_TRANSACTION_SCAN_LIMIT)
 
@@ -194,6 +205,7 @@ export async function processUserTransactions(userId: string) {
     userId,
     open.map((row) => row.merchant_raw)
   )
+  let quickCategories: string[] | null = null
 
   for (const row of open) {
     try {
@@ -204,18 +216,36 @@ export async function processUserTransactions(userId: string) {
         // needs_review rows were already flagged (and prompted) on an earlier run.
         if (row.status !== 'pending') continue
 
-        await supabase.from('transactions').update({ status: 'needs_review' }).eq('id', row.id)
+        // Conditional claim: a concurrent run (cron + fetch-now) that already flagged it gets no row back.
+        const { data: flagged } = await supabase
+          .from('transactions')
+          .update({ status: 'needs_review' })
+          .eq('id', row.id)
+          .eq('status', 'pending')
+          .select('id')
+        if (!flagged?.length) continue
         summary.needsReview += 1
 
         if (chatId) {
           try {
-            await promptForCategory(supabase, userId, chatId, row)
+            quickCategories ??= await getQuickCategories(supabase, userId)
+            await promptForCategory(supabase, userId, chatId, row, quickCategories)
           } catch (error) {
             console.error('pipeline.telegram_prompt_failed', { userId, transactionId: row.id, error })
           }
         }
         continue
       }
+
+      // Claim by setting the category while it is still null, so two concurrent runs can't both
+      // publish this row to Monarch.
+      const { data: claimed } = await supabase
+        .from('transactions')
+        .update({ category: categorization.category })
+        .eq('id', row.id)
+        .is('category', null)
+        .select('id')
+      if (!claimed?.length) continue
 
       summary.autoCategorized += 1
       const publish = await publishers.monarch.publish(userId, { ...parsed, category: categorization.category })
