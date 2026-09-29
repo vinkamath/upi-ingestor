@@ -4,39 +4,14 @@ import { fetchGmailTransactions } from '@/lib/email-sources/gmail'
 import { sendTelegramMessage } from '@/lib/telegram/client'
 import { buildCategoryKeyboard } from '@/lib/telegram/category-keyboard'
 import { DEFAULT_PINNED_CATEGORY_NAMES } from '@/lib/monarch-categories'
-import { publishers } from '@/lib/publishers'
-import type { ParsedTransaction } from '@/lib/types/domain'
+import { publishTransactionRow, rowToParsed, type TransactionRow } from '@/lib/publishers'
+import type { TransactionStatus } from '@/lib/types/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** How many open (unpublished, uncategorized) transactions each run re-checks. */
 const OPEN_TRANSACTION_SCAN_LIMIT = 200
 
-type TransactionRow = {
-  id: string
-  status: 'pending' | 'needs_review' | 'published' | 'failed'
-  amount: number | string
-  merchant_raw: string
-  merchant_normalized: string
-  occurred_at: string
-  email_received_at: string | null
-  bank_ref_id: string
-  source_message_id: string
-  raw_payload: Record<string, unknown> | null
-}
-
-function rowToParsed(row: TransactionRow): ParsedTransaction {
-  return {
-    amount: Number(row.amount),
-    merchantRaw: row.merchant_raw,
-    merchantNormalized: row.merchant_normalized,
-    occurredAt: row.occurred_at,
-    emailReceivedAt: row.email_received_at ?? row.occurred_at,
-    bankRefId: row.bank_ref_id,
-    sourceMessageId: row.source_message_id,
-    currency: 'INR',
-    rawPayload: row.raw_payload ?? {},
-  }
-}
+type OpenRow = TransactionRow & { status: TransactionStatus; id: string }
 
 async function getTelegramChatId(supabase: SupabaseClient, userId: string) {
   const { data } = await supabase.from('telegram_links').select('chat_id').eq('user_id', userId).maybeSingle()
@@ -56,7 +31,7 @@ async function promptForCategory(
   supabase: SupabaseClient,
   userId: string,
   chatId: string,
-  row: TransactionRow,
+  row: OpenRow,
   quickCategories: string[]
 ) {
   const keyboard = buildCategoryKeyboard(row.id, quickCategories)
@@ -199,7 +174,7 @@ export async function processUserTransactions(userId: string) {
     return summary
   }
 
-  const open = (openRows as TransactionRow[] | null) ?? []
+  const open = (openRows as OpenRow[] | null) ?? []
   const categorize = await createCategorizer(
     supabase,
     userId,
@@ -248,23 +223,8 @@ export async function processUserTransactions(userId: string) {
       if (!claimed?.length) continue
 
       summary.autoCategorized += 1
-      const publish = await publishers.monarch.publish(userId, { ...parsed, category: categorization.category })
-      const rawPayloadForUpdate = publish.success
-        ? parsed.rawPayload
-        : {
-            ...parsed.rawPayload,
-            publish_error: publish.error ?? 'Unknown publish error',
-          }
-
-      await supabase
-        .from('transactions')
-        .update({
-          category: categorization.category,
-          status: publish.success ? 'published' : 'failed',
-          published_id: publish.externalId ?? null,
-          raw_payload: rawPayloadForUpdate,
-        })
-        .eq('id', row.id)
+      const { publish, update } = await publishTransactionRow(userId, row, categorization.category)
+      await supabase.from('transactions').update(update).eq('id', row.id)
       if (publish.success) summary.published += 1
       else summary.failed += 1
     } catch (error) {

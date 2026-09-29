@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { publishers } from '@/lib/publishers'
+import { publishTransactionRow } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
 import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage } from '@/lib/telegram/client'
 import { parseCategoryCallback } from '@/lib/telegram/category-keyboard'
@@ -136,34 +136,8 @@ export async function POST(request: Request) {
     category,
   })
 
-  const publish = await publishers.monarch.publish(tx.user_id, {
-    amount: Number(tx.amount),
-    merchantRaw: tx.merchant_raw,
-    merchantNormalized: tx.merchant_normalized,
-    occurredAt: tx.occurred_at,
-    emailReceivedAt: tx.email_received_at ?? tx.occurred_at,
-    bankRefId: tx.bank_ref_id,
-    sourceMessageId: tx.source_message_id,
-    currency: 'INR',
-    rawPayload: tx.raw_payload,
-    category,
-  })
-  const rawPayloadForUpdate = publish.success
-    ? tx.raw_payload
-    : {
-        ...(tx.raw_payload ?? {}),
-        publish_error: publish.error ?? 'Unknown publish error',
-      }
-
-  await supabase
-    .from('transactions')
-    .update({
-      category,
-      status: publish.success ? 'published' : 'failed',
-      published_id: publish.externalId ?? null,
-      raw_payload: rawPayloadForUpdate,
-    })
-    .eq('id', txId)
+  const { publish, update } = await publishTransactionRow(tx.user_id, tx, category)
+  await supabase.from('transactions').update(update).eq('id', txId)
 
   const summary = `INR ${Number(tx.amount)} at ${tx.merchant_raw} → ${category}`
   if (publish.success) {
