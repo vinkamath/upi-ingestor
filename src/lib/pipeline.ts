@@ -1,10 +1,64 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { categorizeTransaction } from '@/lib/categorizer/engine'
+import { createCategorizer } from '@/lib/categorizer/engine'
 import { fetchGmailTransactions } from '@/lib/email-sources/gmail'
 import { sendTelegramMessage } from '@/lib/telegram/client'
-import { publishers } from '@/lib/publishers'
+import { buildCategoryKeyboard } from '@/lib/telegram/category-keyboard'
+import { DEFAULT_PINNED_CATEGORY_NAMES } from '@/lib/monarch-categories'
+import { publishTransactionRow, rowToParsed, type TransactionRow } from '@/lib/publishers'
+import type { TransactionStatus } from '@/lib/types/domain'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function processUserTransactions(userId: string) {
+/** How many open (unpublished, uncategorized) transactions each run re-checks. */
+const OPEN_TRANSACTION_SCAN_LIMIT = 200
+
+type OpenRow = TransactionRow & { status: TransactionStatus; id: string }
+
+async function getTelegramChatId(supabase: SupabaseClient, userId: string) {
+  const { data } = await supabase.from('telegram_links').select('chat_id').eq('user_id', userId).maybeSingle()
+  return (data?.chat_id as string | undefined) ?? null
+}
+
+async function getQuickCategories(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const { data: prefs } = await supabase
+    .from('user_preferences')
+    .select('pinned_category_names')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return prefs?.pinned_category_names ?? [...DEFAULT_PINNED_CATEGORY_NAMES]
+}
+
+async function promptForCategory(
+  supabase: SupabaseClient,
+  userId: string,
+  chatId: string,
+  row: OpenRow,
+  quickCategories: string[]
+) {
+  const keyboard = buildCategoryKeyboard(row.id, quickCategories)
+  // Set automatically on Vercel deployments; absent locally, where Telegram would reject a localhost link anyway.
+  const appHost = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  const inlineKeyboard: Record<string, string>[][] = keyboard.inline_keyboard
+  if (appHost) inlineKeyboard.push([{ text: 'Open transactions', url: `https://${appHost}/transactions` }])
+
+  const sent = await sendTelegramMessage(
+    chatId,
+    `Uncategorized: INR ${Number(row.amount)} at ${row.merchant_raw}.\nTap a quick category, or pick another in the dashboard.`,
+    { inline_keyboard: inlineKeyboard }
+  )
+
+  await supabase.from('pending_reviews').upsert(
+    {
+      user_id: userId,
+      transaction_id: row.id,
+      telegram_message_id: String(sent?.result?.message_id ?? ''),
+      expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+    },
+    { onConflict: 'transaction_id' }
+  )
+}
+
+/** `sendAlerts: false` for manual fetches: the user is already looking at the dashboard. */
+export async function processUserTransactions(userId: string, { sendAlerts = true } = {}) {
   const supabase = createAdminClient()
   const fetched = await fetchGmailTransactions(userId)
   const txs = fetched.transactions
@@ -14,6 +68,7 @@ export async function processUserTransactions(userId: string) {
     inserted: 0,
     duplicates: 0,
     needsReview: 0,
+    autoCategorized: 0,
     published: 0,
     failed: 0,
     skippedNoBody: fetched.debug.skippedNoBody,
@@ -24,40 +79,38 @@ export async function processUserTransactions(userId: string) {
     gmailError: fetched.error ?? null,
   }
 
-  if (fetched.error) {
-    return summary
+  const chatId = await getTelegramChatId(supabase, userId)
+
+  if (sendAlerts && fetched.error?.needsReconnect && chatId) {
+    try {
+      await sendTelegramMessage(chatId, `UPI Ingestor: ${fetched.error.message}`)
+    } catch (error) {
+      console.error('pipeline.telegram_gmail_alert_failed', { userId, error })
+    }
   }
 
-  if (summary.parseErrors.length > 0) {
-    const { data: tgLink } = await supabase
-      .from('telegram_links')
-      .select('chat_id')
-      .eq('user_id', userId)
-      .maybeSingle()
+  if (sendAlerts && summary.parseErrors.length > 0 && chatId) {
+    const preview = summary.parseErrors
+      .slice(0, 3)
+      .map((error, idx) => `${idx + 1}. ${error.subject}`)
+      .join('\n')
 
-    if (tgLink?.chat_id) {
-      const preview = summary.parseErrors
-        .slice(0, 3)
-        .map((error, idx) => `${idx + 1}. ${error.subject}`)
-        .join('\n')
+    const moreCount = summary.parseErrors.length - 3
+    const moreLine = moreCount > 0 ? `\n…and ${moreCount} more.` : ''
 
-      const moreCount = summary.parseErrors.length - 3
-      const moreLine = moreCount > 0 ? `\n…and ${moreCount} more.` : ''
-
-      try {
-        await sendTelegramMessage(
-          tgLink.chat_id,
-          [
-            `Parse alert: ${summary.parseErrors.length} Gmail message(s) could not be parsed.`,
-            'Required fields missing/invalid: amount, merchant, reference, or date.',
-            preview ? `Examples:\n${preview}${moreLine}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n\n')
-        )
-      } catch (error) {
-        console.error('pipeline.telegram_parse_alert_failed', { userId, error })
-      }
+    try {
+      await sendTelegramMessage(
+        chatId,
+        [
+          `Parse alert: ${summary.parseErrors.length} Gmail message(s) could not be parsed.`,
+          'Required fields missing/invalid: amount, merchant, reference, or date.',
+          preview ? `Examples:\n${preview}${moreLine}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      )
+    } catch (error) {
+      console.error('pipeline.telegram_parse_alert_failed', { userId, error })
     }
   }
 
@@ -75,99 +128,109 @@ export async function processUserTransactions(userId: string) {
         continue
       }
 
-      const { data: inserted, error: insertError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          source_message_id: tx.sourceMessageId,
-          bank_ref_id: tx.bankRefId,
-          amount: tx.amount,
-          merchant_raw: tx.merchantRaw,
-          merchant_normalized: tx.merchantNormalized,
-          occurred_at: tx.occurredAt,
-          email_received_at: tx.emailReceivedAt,
-          raw_payload: tx.rawPayload,
-          status: 'pending',
-        })
-        .select('id')
-        .single()
+      const { error: insertError } = await supabase.from('transactions').insert({
+        user_id: userId,
+        source_message_id: tx.sourceMessageId,
+        bank_ref_id: tx.bankRefId,
+        amount: tx.amount,
+        merchant_raw: tx.merchantRaw,
+        merchant_normalized: tx.merchantNormalized,
+        occurred_at: tx.occurredAt,
+        email_received_at: tx.emailReceivedAt,
+        raw_payload: tx.rawPayload,
+        status: 'pending',
+      })
 
-      if (insertError || !inserted) {
+      if (insertError) {
         summary.failed += 1
         continue
       }
       summary.inserted += 1
+    } catch (error) {
+      summary.failed += 1
+      console.error('pipeline.transaction_insert_failed', { userId, bankRefId: tx.bankRefId, error })
+    }
+  }
 
-      const categorization = await categorizeTransaction(supabase, userId, tx)
+  // Categorize every open transaction, not just the ones inserted in this run. This picks up
+  // rows left `pending` by an interrupted run, and `needs_review` rows whose merchant has since
+  // been learned (or now matches a rule). Runs even when Gmail failed so the backlog still clears.
+  const { data: openRows, error: openError } = await supabase
+    .from('transactions')
+    .select(
+      'id,status,amount,merchant_raw,merchant_normalized,occurred_at,email_received_at,bank_ref_id,source_message_id,raw_payload'
+    )
+    .eq('user_id', userId)
+    .in('status', ['pending', 'needs_review'])
+    .is('category', null)
+    .is('published_id', null)
+    // 'pending' sorts after 'needs_review': descending puts never-processed rows first so a
+    // backlog of old uncategorized review rows can't push them past the limit.
+    .order('status', { ascending: false })
+    .order('occurred_at', { ascending: false })
+    .limit(OPEN_TRANSACTION_SCAN_LIMIT)
+
+  if (openError) {
+    console.error('pipeline.open_transactions_load_failed', { userId, error: openError })
+    return summary
+  }
+
+  const open = (openRows as OpenRow[] | null) ?? []
+  const categorize = await createCategorizer(
+    supabase,
+    userId,
+    open.map((row) => row.merchant_raw)
+  )
+  let quickCategories: string[] | null = null
+
+  for (const row of open) {
+    try {
+      const parsed = rowToParsed(row)
+      const categorization = categorize(parsed)
 
       if (!categorization.category) {
-        const { data: tgLink } = await supabase
-          .from('telegram_links')
-          .select('chat_id')
-          .eq('user_id', userId)
-          .maybeSingle()
+        // needs_review rows were already flagged (and prompted) on an earlier run.
+        if (row.status !== 'pending') continue
 
-        await supabase.from('transactions').update({ status: 'needs_review' }).eq('id', inserted.id)
+        // Conditional claim: a concurrent run (cron + fetch-now) that already flagged it gets no row back.
+        const { data: flagged } = await supabase
+          .from('transactions')
+          .update({ status: 'needs_review' })
+          .eq('id', row.id)
+          .eq('status', 'pending')
+          .select('id')
+        if (!flagged?.length) continue
         summary.needsReview += 1
 
-        if (tgLink?.chat_id) {
-          const { data: categories } = await supabase
-            .from('rules')
-            .select('category')
-            .eq('user_id', userId)
-            .limit(3)
-
-          const buttons = (categories ?? []).map((c) => [
-            { text: c.category, callback_data: `cat:${inserted.id}:${c.category}` },
-          ])
-          const sent = await sendTelegramMessage(
-            tgLink.chat_id,
-            `Uncategorized transaction: INR ${tx.amount} at ${tx.merchantRaw}. Pick a category:`,
-            {
-              inline_keyboard: [
-                ...buttons,
-                [{ text: 'Type new category', callback_data: `cat:${inserted.id}:__manual__` }],
-              ],
-            }
-          )
-
-          await supabase.from('pending_reviews').upsert(
-            {
-              user_id: userId,
-              transaction_id: inserted.id,
-              telegram_message_id: String(sent?.result?.message_id ?? ''),
-              expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-            },
-            { onConflict: 'transaction_id' }
-          )
+        if (chatId) {
+          try {
+            quickCategories ??= await getQuickCategories(supabase, userId)
+            await promptForCategory(supabase, userId, chatId, row, quickCategories)
+          } catch (error) {
+            console.error('pipeline.telegram_prompt_failed', { userId, transactionId: row.id, error })
+          }
         }
-
         continue
       }
 
-      const publisher = publishers.monarch
-      const publish = await publisher.publish(userId, { ...tx, category: categorization.category })
-      const rawPayloadForUpdate = publish.success
-        ? tx.rawPayload
-        : {
-            ...tx.rawPayload,
-            publish_error: publish.error ?? 'Unknown publish error',
-          }
-
-      await supabase
+      // Claim by setting the category while it is still null, so two concurrent runs can't both
+      // publish this row to Monarch.
+      const { data: claimed } = await supabase
         .from('transactions')
-        .update({
-          category: categorization.category,
-          status: publish.success ? 'published' : 'failed',
-          published_id: publish.externalId ?? null,
-          raw_payload: rawPayloadForUpdate,
-        })
-        .eq('id', inserted.id)
+        .update({ category: categorization.category })
+        .eq('id', row.id)
+        .is('category', null)
+        .select('id')
+      if (!claimed?.length) continue
+
+      summary.autoCategorized += 1
+      const { publish, update } = await publishTransactionRow(userId, row, categorization.category)
+      await supabase.from('transactions').update(update).eq('id', row.id)
       if (publish.success) summary.published += 1
       else summary.failed += 1
     } catch (error) {
       summary.failed += 1
-      console.error('pipeline.transaction_failed', { userId, bankRefId: tx.bankRefId, error })
+      console.error('pipeline.transaction_failed', { userId, transactionId: row.id, error })
     }
   }
 

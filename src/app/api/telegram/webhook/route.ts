@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { publishers } from '@/lib/publishers'
+import { publishTransactionRow } from '@/lib/publishers'
 import { learnMerchantMapping } from '@/lib/merchant-mappings'
-import { sendTelegramMessage } from '@/lib/telegram/client'
+import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage } from '@/lib/telegram/client'
+import { parseCategoryCallback } from '@/lib/telegram/category-keyboard'
 import { parseStartLinkCode } from '@/lib/telegram/start-command'
 
 export async function POST(request: Request) {
@@ -78,32 +79,55 @@ export async function POST(request: Request) {
     typeof body === 'object' && body !== null && 'callback_query' in body
       ? ((body as Record<string, unknown>).callback_query as Record<string, unknown> | undefined)
       : undefined
-  if (!callback?.data) return Response.json({ ok: true })
-  if (callback?.id) {
-    const { data: pendingByCallback } = await supabase
-      .from('pending_reviews')
-      .select('id')
-      .eq(
-        'telegram_message_id',
-        String(
-          typeof callback.message === 'object' && callback.message !== null
-            ? ((callback.message as Record<string, unknown>).message_id ?? '')
-            : ''
-        )
-      )
-      .maybeSingle()
+  if (!callback?.data || !callback.id) return Response.json({ ok: true })
+  const callbackId = String(callback.id)
+  const callbackMessage =
+    typeof callback.message === 'object' && callback.message !== null
+      ? (callback.message as Record<string, unknown>)
+      : undefined
+  const messageId = Number(callbackMessage?.message_id)
+  const callbackChat =
+    typeof callbackMessage?.chat === 'object' && callbackMessage.chat !== null
+      ? (callbackMessage.chat as Record<string, unknown>)
+      : undefined
+  const callbackChatId = callbackChat?.id ? String(callbackChat.id) : null
 
-    if (!pendingByCallback) return Response.json({ ok: true })
+  const reply = async (toast: string, messageText?: string) => {
+    try {
+      await answerTelegramCallback(callbackId, toast)
+      if (messageText && callbackChatId && messageId) {
+        await editTelegramMessage(callbackChatId, messageId, messageText)
+      }
+    } catch (error) {
+      console.error('telegram.callback_reply_failed', { callbackId, error })
+    }
   }
 
-  const [prefix, txId, category] = String(callback.data).split(':')
-  if (prefix !== 'cat' || !txId || !category || category === '__manual__') {
+  const parsed = parseCategoryCallback(String(callback.data))
+  if (!parsed) {
+    await reply('Pick another category in the dashboard.')
+    return Response.json({ ok: true })
+  }
+  const { txId, category } = parsed
+
+  // Claim the review by deleting it: only one of two racing taps gets the row back, so a
+  // double tap can't publish the same transaction to Monarch twice.
+  const { data: claimed } = await supabase
+    .from('pending_reviews')
+    .delete()
+    .eq('transaction_id', txId)
+    .eq('telegram_message_id', String(messageId))
+    .select('id')
+  if (!claimed?.length) {
+    await reply('Already handled.', 'This transaction was already categorized.')
     return Response.json({ ok: true })
   }
 
   const { data: tx } = await supabase.from('transactions').select('*').eq('id', txId).maybeSingle()
-  if (!tx) return Response.json({ ok: true })
-  if (tx.status === 'published') return Response.json({ ok: true })
+  if (!tx || tx.status === 'published') {
+    await reply('Already handled.', 'This transaction was already categorized.')
+    return Response.json({ ok: true })
+  }
 
   await learnMerchantMapping({
     supabase,
@@ -112,36 +136,15 @@ export async function POST(request: Request) {
     category,
   })
 
-  const publish = await publishers.monarch.publish(tx.user_id, {
-    amount: Number(tx.amount),
-    merchantRaw: tx.merchant_raw,
-    merchantNormalized: tx.merchant_normalized,
-    occurredAt: tx.occurred_at,
-    emailReceivedAt: tx.email_received_at ?? tx.occurred_at,
-    bankRefId: tx.bank_ref_id,
-    sourceMessageId: tx.source_message_id,
-    currency: 'INR',
-    rawPayload: tx.raw_payload,
-    category,
-  })
-  const rawPayloadForUpdate = publish.success
-    ? tx.raw_payload
-    : {
-        ...(tx.raw_payload ?? {}),
-        publish_error: publish.error ?? 'Unknown publish error',
-      }
+  const { publish, update } = await publishTransactionRow(tx.user_id, tx, category)
+  await supabase.from('transactions').update(update).eq('id', txId)
 
-  await supabase
-    .from('transactions')
-    .update({
-      category,
-      status: publish.success ? 'published' : 'failed',
-      published_id: publish.externalId ?? null,
-      raw_payload: rawPayloadForUpdate,
-    })
-    .eq('id', txId)
-
-  await supabase.from('pending_reviews').delete().eq('transaction_id', txId)
+  const summary = `INR ${Number(tx.amount)} at ${tx.merchant_raw} → ${category}`
+  if (publish.success) {
+    await reply(`Saved as ${category}`, `✅ ${summary}`)
+  } else {
+    await reply('Publish failed', `⚠️ ${summary}\nPublish to Monarch failed: ${publish.error ?? 'unknown error'}. Retry from the dashboard.`)
+  }
 
   return Response.json({ ok: true })
 }

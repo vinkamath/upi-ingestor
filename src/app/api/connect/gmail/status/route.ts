@@ -5,7 +5,7 @@ export async function GET() {
   const { supabase, user } = await getUser()
   const { data, error } = await supabase
     .from('gmail_connections')
-    .select('email_address, updated_at, fetch_since_date')
+    .select('email_address, updated_at, fetch_since_date, imap_app_password_enc')
     .eq('user_id', user.id)
     .maybeSingle()
 
@@ -18,6 +18,7 @@ export async function GET() {
     emailAddress: data?.email_address ?? null,
     lastUpdatedAt: data?.updated_at ?? null,
     fetchSinceDate: data?.fetch_since_date ?? null,
+    appPasswordConfigured: Boolean(data?.imap_app_password_enc),
     defaultFetchDaysBack: getDefaultFetchDaysBack(),
     fetchMaxResults: getDefaultFetchMaxResults(),
   })

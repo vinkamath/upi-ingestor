@@ -57,7 +57,11 @@ export default function SettingsPage() {
     fetchSinceDate: string | null
     defaultFetchDaysBack: number
     fetchMaxResults: number
+    appPasswordConfigured: boolean
   } | null>(null)
+  const [gmailAppPassword, setGmailAppPassword] = useState('')
+  const [isSavingAppPassword, setIsSavingAppPassword] = useState(false)
+  const [appPasswordMessage, setAppPasswordMessage] = useState<string | null>(null)
   const [gmailFetchSinceDate, setGmailFetchSinceDate] = useState('')
   const [isSavingGmailFetch, setIsSavingGmailFetch] = useState(false)
   const [gmailFetchMessage, setGmailFetchMessage] = useState<string | null>(null)
@@ -100,6 +104,39 @@ export default function SettingsPage() {
     }
     setGmailStatus(json)
     setGmailFetchSinceDate(json.fetchSinceDate ?? '')
+  }
+
+  async function saveGmailAppPassword() {
+    setAppPasswordMessage(null)
+    setIsSavingAppPassword(true)
+    const res = await fetch('/api/connect/gmail/app-password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appPassword: gmailAppPassword }),
+    })
+    const json = await res.json().catch(() => null)
+    setIsSavingAppPassword(false)
+    if (!res.ok) {
+      setAppPasswordMessage(`Failed to save: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setGmailAppPassword('')
+    setAppPasswordMessage('App password verified and saved. Gmail fetches now use IMAP.')
+    await loadGmailStatus()
+  }
+
+  async function removeGmailAppPassword() {
+    setAppPasswordMessage(null)
+    setIsSavingAppPassword(true)
+    const res = await fetch('/api/connect/gmail/app-password', { method: 'DELETE' })
+    const json = await res.json().catch(() => null)
+    setIsSavingAppPassword(false)
+    if (!res.ok) {
+      setAppPasswordMessage(`Failed to remove: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setAppPasswordMessage('App password removed. Gmail fetches fall back to Google sign-in (expires every 7 days).')
+    await loadGmailStatus()
   }
 
   async function saveGmailFetchSinceDate(fetchSinceDate: string | null) {
@@ -404,6 +441,50 @@ export default function SettingsPage() {
               {gmailStatus?.connected ? 'Reconnect Gmail' : 'Connect with Google'}
             </a>
           </Button>
+          <div className="space-y-1.5 pt-3 border-t border-border">
+            <Label htmlFor="gmail-app-password" className="text-[12px]">
+              Gmail app password (IMAP)
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id="gmail-app-password"
+                type="password"
+                autoComplete="off"
+                placeholder={gmailStatus?.appPasswordConfigured ? '•••• saved — paste to replace' : 'xxxx xxxx xxxx xxxx'}
+                className="h-8 text-[13px] max-w-[260px]"
+                value={gmailAppPassword}
+                disabled={!gmailStatus?.connected || isSavingAppPassword}
+                onChange={(e) => setGmailAppPassword(e.target.value)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!gmailStatus?.connected || isSavingAppPassword || !gmailAppPassword.trim()}
+                onClick={() => void saveGmailAppPassword()}
+              >
+                {isSavingAppPassword ? 'Checking…' : 'Save'}
+              </Button>
+              {gmailStatus?.appPasswordConfigured ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isSavingAppPassword}
+                  onClick={() => void removeGmailAppPassword()}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              {gmailStatus?.appPasswordConfigured
+                ? 'Fetching over IMAP with your app password. It does not expire unless you revoke it or change your Google password.'
+                : 'Google sign-in tokens expire every 7 days while the Google app is unpublished. Create an app password at myaccount.google.com/apppasswords (needs 2-Step Verification) and paste it here to stop re-authorizing.'}
+            </p>
+            {appPasswordMessage ? (
+              <p className="text-[12px] text-muted-foreground">{appPasswordMessage}</p>
+            ) : null}
+          </div>
           <div className="space-y-3 pt-3 border-t border-border">
               <div className="space-y-1.5">
                 <Label htmlFor="gmail-fetch-since" className="text-[12px]">
