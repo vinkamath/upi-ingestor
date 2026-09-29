@@ -10,7 +10,9 @@ function getKey() {
   return buf
 }
 
-export function encrypt(plainText: string) {
+export type EncryptedPayload = { iv: string; content: string; authTag: string }
+
+export function encrypt(plainText: string): EncryptedPayload {
   const iv = crypto.randomBytes(12)
   const cipher = crypto.createCipheriv(ALGO, getKey(), iv)
   const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()])
@@ -23,7 +25,7 @@ export function encrypt(plainText: string) {
   }
 }
 
-export function decrypt(payload: { iv: string; content: string; authTag: string }) {
+export function decrypt(payload: EncryptedPayload) {
   const decipher = crypto.createDecipheriv(ALGO, getKey(), Buffer.from(payload.iv, 'base64'))
   decipher.setAuthTag(Buffer.from(payload.authTag, 'base64'))
   const decrypted = Buffer.concat([

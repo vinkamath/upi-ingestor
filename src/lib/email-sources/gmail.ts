@@ -2,7 +2,7 @@ import { google, gmail_v1 } from 'googleapis'
 import type { ParsedTransaction } from '@/lib/types/domain'
 import { parseUpiEmail } from '@/lib/parsers'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { decrypt } from '@/lib/crypto/encryption'
+import { decrypt, type EncryptedPayload } from '@/lib/crypto/encryption'
 import {
   getDefaultFetchDaysBack,
   getDefaultFetchMaxResults,
@@ -106,8 +106,6 @@ function toGmailFetchError(error: unknown): GmailFetchError {
   }
 }
 
-type CredentialPayload = { iv: string; content: string; authTag: string }
-
 async function fetchViaGmailApi(refreshToken: string, query: string, maxResults: number): Promise<RawEmail[]> {
   const gmail = google.gmail({ version: 'v1', auth: getOauthClient(refreshToken) })
   const list = await gmail.users.messages.list({ userId: 'me', maxResults, q: query })
@@ -173,7 +171,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
 
     // Prefer IMAP with an app password: it doesn't expire. OAuth tokens from an unpublished
     // ("Testing") Google app expire after 7 days, so that path is only a fallback.
-    const appPasswordEnc = connection.imap_app_password_enc as CredentialPayload | null
+    const appPasswordEnc = connection.imap_app_password_enc as EncryptedPayload | null
     const messages = appPasswordEnc
       ? await fetchGmailViaImap({
           email: connection.email_address as string,
@@ -182,7 +180,7 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
           maxResults,
         })
       : await fetchViaGmailApi(
-          decrypt(connection.refresh_token_enc as CredentialPayload),
+          decrypt(connection.refresh_token_enc as EncryptedPayload),
           query,
           maxResults
         )

@@ -1,12 +1,6 @@
 import { getUser } from '@/lib/db/server'
-import { decrypt } from '@/lib/crypto/encryption'
+import { decrypt, type EncryptedPayload } from '@/lib/crypto/encryption'
 import type { MonarchCategoryOption } from '@/lib/monarch-categories'
-
-type CredentialPayload = {
-  iv: string
-  content: string
-  authTag: string
-}
 
 type CategoriesError = {
   message: string
@@ -21,7 +15,7 @@ function buildTokenHeader(secret: string) {
 }
 
 async function fetchMonarchCategories(
-  credentialEnc: CredentialPayload
+  credentialEnc: EncryptedPayload
 ): Promise<{ categories: MonarchCategoryOption[] } | { error: CategoriesError }> {
   const graphqlUrl = process.env.MONARCH_GRAPHQL_URL
   if (!graphqlUrl) return { error: { message: 'MONARCH_GRAPHQL_URL not set', needsReconnect: false } }
@@ -89,7 +83,7 @@ export async function GET() {
     )
   }
 
-  const result = await fetchMonarchCategories(data.credential_enc as CredentialPayload)
+  const result = await fetchMonarchCategories(data.credential_enc as EncryptedPayload)
   if ('error' in result) {
     console.error('monarch.categories_failed', { userId: user.id, error: result.error.message })
     return Response.json(
