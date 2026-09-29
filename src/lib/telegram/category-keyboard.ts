@@ -12,8 +12,11 @@ export function buildCategoryKeyboard(txId: string, categoryNames: string[]) {
   return { inline_keyboard: rows }
 }
 
-/** Inverse of the callback_data above. Category names may contain ':'. */
+/**
+ * Inverse of the callback_data above. Category names may contain ':'.
+ * `__manual__` is the old "Type new category" button still sitting in chats; it is not a category.
+ */
 export function parseCategoryCallback(data: string) {
   const match = data.match(/^cat:([^:]+):(.+)$/)
-  return match ? { txId: match[1], category: match[2] } : null
+  return match && match[2] !== '__manual__' ? { txId: match[1], category: match[2] } : null
 }

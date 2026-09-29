@@ -16,4 +16,5 @@ test('parseCategoryCallback', () => {
   assert.deepEqual(parseCategoryCallback(`cat:${txId}:Bills: Rent`), { txId, category: 'Bills: Rent' })
   assert.equal(parseCategoryCallback('cat:abc'), null)
   assert.equal(parseCategoryCallback('other:abc:x'), null)
+  assert.equal(parseCategoryCallback(`cat:${txId}:__manual__`), null)
 })
