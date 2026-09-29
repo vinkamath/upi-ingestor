@@ -57,7 +57,8 @@ async function promptForCategory(
   )
 }
 
-export async function processUserTransactions(userId: string) {
+/** `sendAlerts: false` for manual fetches: the user is already looking at the dashboard. */
+export async function processUserTransactions(userId: string, { sendAlerts = true } = {}) {
   const supabase = createAdminClient()
   const fetched = await fetchGmailTransactions(userId)
   const txs = fetched.transactions
@@ -80,7 +81,7 @@ export async function processUserTransactions(userId: string) {
 
   const chatId = await getTelegramChatId(supabase, userId)
 
-  if (fetched.error?.needsReconnect && chatId) {
+  if (sendAlerts && fetched.error?.needsReconnect && chatId) {
     try {
       await sendTelegramMessage(chatId, `UPI Ingestor: ${fetched.error.message}`)
     } catch (error) {
@@ -88,7 +89,7 @@ export async function processUserTransactions(userId: string) {
     }
   }
 
-  if (summary.parseErrors.length > 0 && chatId) {
+  if (sendAlerts && summary.parseErrors.length > 0 && chatId) {
     const preview = summary.parseErrors
       .slice(0, 3)
       .map((error, idx) => `${idx + 1}. ${error.subject}`)
