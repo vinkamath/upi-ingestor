@@ -110,20 +110,21 @@ export async function POST(request: Request) {
   }
   const { txId, category } = parsed
 
-  const { data: pending } = await supabase
+  // Claim the review by deleting it: only one of two racing taps gets the row back, so a
+  // double tap can't publish the same transaction to Monarch twice.
+  const { data: claimed } = await supabase
     .from('pending_reviews')
-    .select('id')
+    .delete()
     .eq('transaction_id', txId)
     .eq('telegram_message_id', String(messageId))
-    .maybeSingle()
-  if (!pending) {
+    .select('id')
+  if (!claimed?.length) {
     await reply('Already handled.', 'This transaction was already categorized.')
     return Response.json({ ok: true })
   }
 
   const { data: tx } = await supabase.from('transactions').select('*').eq('id', txId).maybeSingle()
   if (!tx || tx.status === 'published') {
-    await supabase.from('pending_reviews').delete().eq('transaction_id', txId)
     await reply('Already handled.', 'This transaction was already categorized.')
     return Response.json({ ok: true })
   }
@@ -163,8 +164,6 @@ export async function POST(request: Request) {
       raw_payload: rawPayloadForUpdate,
     })
     .eq('id', txId)
-
-  await supabase.from('pending_reviews').delete().eq('transaction_id', txId)
 
   const summary = `INR ${Number(tx.amount)} at ${tx.merchant_raw} → ${category}`
   if (publish.success) {
