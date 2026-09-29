@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createCategorizer } from '@/lib/categorizer/engine'
 import { fetchGmailTransactions } from '@/lib/email-sources/gmail'
 import { sendTelegramMessage } from '@/lib/telegram/client'
+import { buildCategoryKeyboard } from '@/lib/telegram/category-keyboard'
+import { DEFAULT_PINNED_CATEGORY_NAMES } from '@/lib/monarch-categories'
 import { publishers } from '@/lib/publishers'
 import type { ParsedTransaction } from '@/lib/types/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -42,17 +44,23 @@ async function getTelegramChatId(supabase: SupabaseClient, userId: string) {
 }
 
 async function promptForCategory(supabase: SupabaseClient, userId: string, chatId: string, row: TransactionRow) {
-  const { data: categories } = await supabase.from('rules').select('category').eq('user_id', userId).limit(3)
+  const { data: prefs } = await supabase
+    .from('user_preferences')
+    .select('pinned_category_names')
+    .eq('user_id', userId)
+    .maybeSingle()
+  const quickCategories: string[] = prefs?.pinned_category_names ?? [...DEFAULT_PINNED_CATEGORY_NAMES]
 
-  const buttons = (categories ?? []).map((c) => [
-    { text: c.category, callback_data: `cat:${row.id}:${c.category}` },
-  ])
+  const keyboard = buildCategoryKeyboard(row.id, quickCategories)
+  // Set automatically on Vercel deployments; absent locally, where Telegram would reject a localhost link anyway.
+  const appHost = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  const inlineKeyboard: Record<string, string>[][] = keyboard.inline_keyboard
+  if (appHost) inlineKeyboard.push([{ text: 'Open transactions', url: `https://${appHost}/transactions` }])
+
   const sent = await sendTelegramMessage(
     chatId,
-    `Uncategorized transaction: INR ${Number(row.amount)} at ${row.merchant_raw}. Pick a category:`,
-    {
-      inline_keyboard: [...buttons, [{ text: 'Type new category', callback_data: `cat:${row.id}:__manual__` }]],
-    }
+    `Uncategorized: INR ${Number(row.amount)} at ${row.merchant_raw}.\nTap a quick category, or pick another in the dashboard.`,
+    { inline_keyboard: inlineKeyboard }
   )
 
   await supabase.from('pending_reviews').upsert(
