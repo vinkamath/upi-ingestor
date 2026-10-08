@@ -42,8 +42,9 @@ async function connect(client: ImapFlow) {
   try {
     await client.connect()
   } catch (error) {
-    if ((error as { authenticationFailed?: boolean }).authenticationFailed) {
-      throw new ImapAuthError('Gmail rejected the app password')
+    const { authenticationFailed, responseText } = error as { authenticationFailed?: boolean; responseText?: string }
+    if (authenticationFailed) {
+      throw new ImapAuthError(responseText ? `Gmail said: ${responseText}` : 'Gmail rejected the app password')
     }
     throw error
   }

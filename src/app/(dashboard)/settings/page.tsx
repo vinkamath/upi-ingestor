@@ -125,6 +125,27 @@ export default function SettingsPage() {
     await loadGmailStatus()
   }
 
+  async function testGmailAppPassword() {
+    setAppPasswordMessage(null)
+    setIsSavingAppPassword(true)
+    const res = await fetch('/api/connect/gmail/app-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appPassword: gmailAppPassword }),
+    })
+    const json = await res.json().catch(() => null)
+    setIsSavingAppPassword(false)
+    if (!res.ok) {
+      setAppPasswordMessage(`Test failed: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setAppPasswordMessage(
+      `Test passed: Gmail accepted the ${json?.source ?? 'saved'} app password for ${json?.emailAddress ?? 'your account'}.${
+        json?.source === 'typed' ? ' It is not saved yet — click Save.' : ''
+      }`
+    )
+  }
+
   async function removeGmailAppPassword() {
     setAppPasswordMessage(null)
     setIsSavingAppPassword(true)
@@ -463,6 +484,19 @@ export default function SettingsPage() {
                 onClick={() => void saveGmailAppPassword()}
               >
                 {isSavingAppPassword ? 'Checking…' : 'Save'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={
+                  !gmailStatus?.connected ||
+                  isSavingAppPassword ||
+                  (!gmailAppPassword.trim() && !gmailStatus?.appPasswordConfigured)
+                }
+                onClick={() => void testGmailAppPassword()}
+              >
+                {gmailAppPassword.trim() ? 'Test typed' : 'Test saved'}
               </Button>
               {gmailStatus?.appPasswordConfigured ? (
                 <Button
