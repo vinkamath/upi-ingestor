@@ -536,8 +536,8 @@ export default function SettingsPage() {
                   {!gmailStatus?.connected
                     ? 'Connect Gmail above to set how far back imports should go.'
                     : gmailStatus.fetchSinceDate
-                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`
-                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`}
+                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight), overriding the last imported email. Clear it once your backfill is done. Up to ${gmailStatus.fetchMaxResults ?? 100} messages per run.`
+                      : `Leave empty to continue from the last imported email (the first import covers the last ${gmailStatus.defaultFetchDaysBack ?? 30} day(s)). Up to ${gmailStatus.fetchMaxResults ?? 100} messages per run.`}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -559,7 +559,7 @@ export default function SettingsPage() {
                     disabled={isSavingGmailFetch}
                     onClick={() => void saveGmailFetchSinceDate(null)}
                   >
-                    Use default window
+                    Continue from last email
                   </Button>
                 ) : null}
               </div>
