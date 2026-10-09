@@ -125,6 +125,27 @@ export default function SettingsPage() {
     await loadGmailStatus()
   }
 
+  async function testGmailAppPassword() {
+    setAppPasswordMessage(null)
+    setIsSavingAppPassword(true)
+    const res = await fetch('/api/connect/gmail/app-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appPassword: gmailAppPassword }),
+    })
+    const json = await res.json().catch(() => null)
+    setIsSavingAppPassword(false)
+    if (!res.ok) {
+      setAppPasswordMessage(`Test failed: ${json?.error ?? 'Unknown error'}`)
+      return
+    }
+    setAppPasswordMessage(
+      `Test passed: Gmail accepted the ${json?.source ?? 'saved'} app password for ${json?.emailAddress ?? 'your account'}.${
+        json?.source === 'typed' ? ' It is not saved yet — click Save.' : ''
+      }`
+    )
+  }
+
   async function removeGmailAppPassword() {
     setAppPasswordMessage(null)
     setIsSavingAppPassword(true)
@@ -189,7 +210,7 @@ export default function SettingsPage() {
     }
 
     setMonarchMessage(
-      `Connection saved${json?.accountCount ? ` — ${json.accountCount} account(s) found` : ''}. Select a default account and save again if needed.`
+      `Connection saved${json?.accountCount ? ` — ${json.accountCount} account(s) found` : ''}${json?.republished ? ` — published ${json.republished} transaction(s) that failed while signed out` : ''}. Select a default account and save again if needed.`
     )
     await loadMonarchStatus()
   }
@@ -464,6 +485,19 @@ export default function SettingsPage() {
               >
                 {isSavingAppPassword ? 'Checking…' : 'Save'}
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={
+                  !gmailStatus?.connected ||
+                  isSavingAppPassword ||
+                  (!gmailAppPassword.trim() && !gmailStatus?.appPasswordConfigured)
+                }
+                onClick={() => void testGmailAppPassword()}
+              >
+                {gmailAppPassword.trim() ? 'Test typed' : 'Test saved'}
+              </Button>
               {gmailStatus?.appPasswordConfigured ? (
                 <Button
                   type="button"
@@ -502,8 +536,8 @@ export default function SettingsPage() {
                   {!gmailStatus?.connected
                     ? 'Connect Gmail above to set how far back imports should go.'
                     : gmailStatus.fetchSinceDate
-                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`
-                      : `Leave empty to use the server default: last ${gmailStatus.defaultFetchDaysBack ?? 3} day(s). Up to ${gmailStatus.fetchMaxResults ?? 25} messages per run.`}
+                      ? `Currently importing from ${gmailStatus.fetchSinceDate} onward (IST midnight), overriding the last imported email. Clear it once your backfill is done. Up to ${gmailStatus.fetchMaxResults ?? 100} messages per run.`
+                      : `Leave empty to continue from the last imported email (the first import covers the last ${gmailStatus.defaultFetchDaysBack ?? 30} day(s)). Up to ${gmailStatus.fetchMaxResults ?? 100} messages per run.`}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -525,7 +559,7 @@ export default function SettingsPage() {
                     disabled={isSavingGmailFetch}
                     onClick={() => void saveGmailFetchSinceDate(null)}
                   >
-                    Use default window
+                    Continue from last email
                   </Button>
                 ) : null}
               </div>

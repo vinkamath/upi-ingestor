@@ -1,6 +1,7 @@
 import { getUser } from '@/lib/db/server'
 import { decrypt, encrypt } from '@/lib/crypto/encryption'
 import { z } from 'zod'
+import { retryFailedPublishes } from '@/lib/pipeline'
 
 const schema = z.object({
   email: z.string().email(),
@@ -121,8 +122,13 @@ export async function POST(request: Request) {
   })
 
   if (error) return Response.json({ error: error.message }, { status: 400 })
+
+  // Publish whatever failed while the old credential was expired.
+  const retry = await retryFailedPublishes(user.id)
+
   return Response.json({
     ok: true,
+    republished: retry.published,
     accountCount: validation.accountCount,
     accounts: validation.accounts,
     selectedDefaultAccountId: defaultAccountId ?? null,
