@@ -222,7 +222,7 @@ export default function TransactionsPage() {
     }
     if (summary) {
       setStatusMessage({
-        text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${summary.autoCategorized ?? 0} auto-categorized · ${count} total`,
+        text: `Fetched: ${summary.fetched} matched · ${summary.parsed} parsed · ${summary.inserted} inserted · ${summary.duplicates} dupes · ${summary.autoCategorized ?? 0} auto-categorized · ${summary.republished ?? 0} retried to Monarch · ${count} total`,
       })
       return
     }

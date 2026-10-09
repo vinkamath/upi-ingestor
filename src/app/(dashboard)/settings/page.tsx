@@ -210,7 +210,7 @@ export default function SettingsPage() {
     }
 
     setMonarchMessage(
-      `Connection saved${json?.accountCount ? ` — ${json.accountCount} account(s) found` : ''}. Select a default account and save again if needed.`
+      `Connection saved${json?.accountCount ? ` — ${json.accountCount} account(s) found` : ''}${json?.republished ? ` — published ${json.republished} transaction(s) that failed while signed out` : ''}. Select a default account and save again if needed.`
     )
     await loadMonarchStatus()
   }

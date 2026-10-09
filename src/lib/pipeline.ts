@@ -57,6 +57,56 @@ async function promptForCategory(
   )
 }
 
+/**
+ * Re-publishes rows that were categorized but failed to reach Monarch (e.g. while the Monarch
+ * credential was expired). Runs on every pipeline run and right after Monarch is reconnected.
+ */
+export async function retryFailedPublishes(userId: string) {
+  const supabase = createAdminClient()
+  const result = { retried: 0, published: 0, failed: 0 }
+
+  const { data: rows, error } = await supabase
+    .from('transactions')
+    .select(
+      'id,amount,merchant_raw,merchant_normalized,occurred_at,email_received_at,bank_ref_id,source_message_id,raw_payload,category'
+    )
+    .eq('user_id', userId)
+    .eq('status', 'failed')
+    .not('category', 'is', null)
+    .is('published_id', null)
+    .order('occurred_at', { ascending: true })
+    .limit(OPEN_TRANSACTION_SCAN_LIMIT)
+  if (error) {
+    console.error('pipeline.failed_publishes_load_failed', { userId, error })
+    return result
+  }
+
+  for (const row of (rows as Array<TransactionRow & { id: string; category: string }> | null) ?? []) {
+    // Claim failed → pending so a concurrent run (cron + reconnect) can't publish it twice.
+    const { data: claimed } = await supabase
+      .from('transactions')
+      .update({ status: 'pending' })
+      .eq('id', row.id)
+      .eq('status', 'failed')
+      .select('id')
+    if (!claimed?.length) continue
+    result.retried += 1
+
+    try {
+      const { publish, update } = await publishTransactionRow(userId, row, row.category)
+      await supabase.from('transactions').update(update).eq('id', row.id)
+      if (publish.success) result.published += 1
+      else result.failed += 1
+    } catch (error) {
+      result.failed += 1
+      await supabase.from('transactions').update({ status: 'failed' }).eq('id', row.id)
+      console.error('pipeline.publish_retry_failed', { userId, transactionId: row.id, error })
+    }
+  }
+
+  return result
+}
+
 /** `sendAlerts: false` for manual fetches: the user is already looking at the dashboard. */
 export async function processUserTransactions(userId: string, { sendAlerts = true } = {}) {
   const supabase = createAdminClient()
@@ -71,6 +121,7 @@ export async function processUserTransactions(userId: string, { sendAlerts = tru
     autoCategorized: 0,
     published: 0,
     failed: 0,
+    republished: 0,
     skippedNoBody: fetched.debug.skippedNoBody,
     skippedParseFailure: fetched.debug.skippedParseFailure,
     parseErrors: fetched.debug.parseErrors,
@@ -169,6 +220,10 @@ export async function processUserTransactions(userId: string, { sendAlerts = tru
     .order('status', { ascending: false })
     .order('occurred_at', { ascending: false })
     .limit(OPEN_TRANSACTION_SCAN_LIMIT)
+
+  // Before categorizing new rows, so rows this run fails to publish aren't retried immediately.
+  const retry = await retryFailedPublishes(userId)
+  summary.republished = retry.published
 
   if (openError) {
     console.error('pipeline.open_transactions_load_failed', { userId, error: openError })
