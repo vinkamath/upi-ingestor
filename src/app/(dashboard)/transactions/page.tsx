@@ -124,6 +124,7 @@ export default function TransactionsPage() {
   const [usdPerInr, setUsdPerInr] = useState<number | null>(null)
   const [rateDate, setRateDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
   const [statusFilter, setStatusFilter] = useState<TxStatusFilter>('needs_review')
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -201,6 +202,15 @@ export default function TransactionsPage() {
   }
 
   async function fetchNow() {
+    setIsFetching(true)
+    try {
+      await fetchFromGmail()
+    } finally {
+      setIsFetching(false)
+    }
+  }
+
+  async function fetchFromGmail() {
     setStatusMessage({ text: 'Fetching latest Gmail transactions…' })
     const res = await fetch('/api/gmail/fetch-now', { method: 'POST' })
     if (!res.ok) {
@@ -396,7 +406,7 @@ export default function TransactionsPage() {
   const filteredTxs = txs.filter((tx) => (statusFilter === 'all' ? true : tx.status === statusFilter))
   const selectedCount = filteredTxs.reduce((count, tx) => count + (selectedIds[tx.id] ? 1 : 0), 0)
   const allSelected = filteredTxs.length > 0 && selectedCount === filteredTxs.length
-  const isBusy = isLoading || publishingAll || Boolean(deletingId) || Boolean(savingCategoryId)
+  const isBusy = isLoading || isFetching || publishingAll || Boolean(deletingId) || Boolean(savingCategoryId)
   const categoryGroups = useMemo(
     () => partitionMonarchCategoriesForPicker(categories, pinnedCategoryNames),
     [categories, pinnedCategoryNames]
@@ -426,9 +436,9 @@ export default function TransactionsPage() {
           size="sm"
           className="gap-2 shrink-0"
         >
-          <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
-          <span className="hidden sm:inline">{isLoading ? 'Loading…' : 'Fetch Gmail'}</span>
-          <span className="sm:hidden">{isLoading ? '…' : 'Fetch'}</span>
+          <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
+          <span className="hidden sm:inline">{isFetching ? 'Fetching…' : 'Fetch Gmail'}</span>
+          <span className="sm:hidden">{isFetching ? '…' : 'Fetch'}</span>
         </Button>
       </div>
 
