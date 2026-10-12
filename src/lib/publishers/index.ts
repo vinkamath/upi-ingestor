@@ -34,13 +34,15 @@ export function rowToParsed(row: TransactionRow): ParsedTransaction {
 /** Publishes a stored row to Monarch and returns the result plus the columns to write back. */
 export async function publishTransactionRow(userId: string, row: TransactionRow, category: string) {
   const publish = await publishers.monarch.publish(userId, { ...rowToParsed(row), category })
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- drop a stale error from an earlier attempt
+  const { publish_error, ...payload } = row.raw_payload ?? {}
   const update = {
     category,
     status: publish.success ? ('published' as const) : ('failed' as const),
     published_id: publish.externalId ?? null,
     raw_payload: publish.success
-      ? row.raw_payload
-      : { ...(row.raw_payload ?? {}), publish_error: publish.error ?? 'Unknown publish error' },
+      ? payload
+      : { ...payload, publish_error: publish.error ?? 'Unknown publish error' },
   }
   return { publish, update }
 }

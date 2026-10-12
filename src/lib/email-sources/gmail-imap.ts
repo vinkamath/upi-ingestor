@@ -19,11 +19,13 @@ export async function toRawEmail(
 ): Promise<RawEmail> {
   const parsed = await simpleParser(source)
   const receivedAt = meta.internalDate ? new Date(meta.internalDate) : null
+  // HDFC alerts can be HTML-only; fall back to the HTML like the Gmail API path does.
+  const body = parsed.text?.trim() ? parsed.text : parsed.html || null
   return {
     id: meta.id,
     from: parsed.from?.text ?? '',
     subject: parsed.subject ?? '(no-subject)',
-    body: parsed.text?.trim() ? parsed.text : null,
+    body,
     receivedAt: receivedAt && !Number.isNaN(receivedAt.getTime()) ? receivedAt : null,
   }
 }
@@ -42,8 +44,9 @@ async function connect(client: ImapFlow) {
   try {
     await client.connect()
   } catch (error) {
-    if ((error as { authenticationFailed?: boolean }).authenticationFailed) {
-      throw new ImapAuthError('Gmail rejected the app password')
+    const { authenticationFailed, responseText } = error as { authenticationFailed?: boolean; responseText?: string }
+    if (authenticationFailed) {
+      throw new ImapAuthError(responseText ? `Gmail said: ${responseText}` : 'Gmail rejected the app password')
     }
     throw error
   }

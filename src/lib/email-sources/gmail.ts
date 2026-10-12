@@ -11,6 +11,8 @@ import {
 } from '@/lib/email-sources/gmail-cutoff'
 import { fetchGmailViaImap, ImapAuthError, type RawEmail } from '@/lib/email-sources/gmail-imap'
 
+const RESUME_OVERLAP_SECONDS = 60 * 60
+
 function getOauthClient(refreshToken: string) {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
     throw new Error('Google OAuth env vars are not configured')
@@ -163,10 +165,24 @@ export async function fetchGmailTransactions(userId: string): Promise<GmailFetch
   try {
     const maxResults = getDefaultFetchMaxResults()
     const labelName = process.env.GMAIL_FETCH_LABEL?.trim() || 'UPI'
+    // An explicit "earliest import date" wins (it's how you backfill). Otherwise continue from the
+    // newest imported email, overlapping a little since duplicates are skipped by bank_ref_id.
+    // The fixed window only applies to a first import.
     const fetchSinceDate = connection.fetch_since_date as string | null
+    const { data: latest } = await supabase
+      .from('transactions')
+      .select('email_received_at')
+      .eq('user_id', userId)
+      .not('email_received_at', 'is', null)
+      .order('email_received_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const latestEpoch = latest ? Math.floor(new Date(latest.email_received_at as string).getTime() / 1000) : null
     const afterEpoch = fetchSinceDate
       ? getIstMidnightEpochSecondsForYmd(fetchSinceDate)
-      : getIstMidnightCutoffEpochSeconds(getDefaultFetchDaysBack())
+      : latestEpoch
+        ? latestEpoch - RESUME_OVERLAP_SECONDS
+        : getIstMidnightCutoffEpochSeconds(getDefaultFetchDaysBack())
     const query = `label:${labelName} after:${afterEpoch}`
 
     // Prefer IMAP with an app password: it doesn't expire. OAuth tokens from an unpublished

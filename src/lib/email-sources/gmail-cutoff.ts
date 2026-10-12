@@ -46,8 +46,8 @@ export function getTodayYmdInIst(now = new Date()) {
   return `${year}-${mm}-${dd}`
 }
 
-const DEFAULT_FETCH_DAYS_BACK = 3
-const DEFAULT_FETCH_MAX_RESULTS = 25
+const DEFAULT_FETCH_DAYS_BACK = 30
+const DEFAULT_FETCH_MAX_RESULTS = 100
 
 function getPositiveIntEnv(name: string, fallback: number) {
   const value = process.env[name]

@@ -46,3 +46,15 @@ test('parses an HTML-only UPI email fetched over IMAP', async () => {
   assert.equal(tx.merchantRaw, 'SHOEB NAZIR DALVI')
   assert.equal(tx.bankRefId, '196835150941')
 })
+
+// HDFC's current alerts: multipart/alternative holding only an HTML part, for which mailparser leaves `text` undefined.
+test('parses a multipart/alternative email with only an HTML part', async () => {
+  const html = `<html><body><p>${TEXT.split('\n\n')[1]}</p><p>${TEXT.split('\n\n')[2]}</p></body></html>`
+  const body = ['--b', 'Content-Type: text/html; charset=utf-8', '', html, '--b--'].join('\r\n')
+  const email = await toRawEmail(mime('multipart/alternative; boundary="b"', body), { id: '191' })
+
+  const tx = parseUpiEmail(email.id, email.from, email.body ?? '')
+  assert.ok(tx)
+  assert.equal(tx.merchantRaw, 'SHOEB NAZIR DALVI')
+  assert.equal(tx.bankRefId, '196835150941')
+})
